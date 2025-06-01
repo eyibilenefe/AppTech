@@ -1,54 +1,63 @@
 import { Tabs } from 'expo-router';
 import React from 'react';
-import { Platform } from 'react-native';
 
-import { IconSymbol } from '@/components/ui/IconSymbol';
-import { Colors } from '@/constants/Colors';
-import { useColorScheme } from '@/hooks/useColorScheme';
+import { AnimatedTabBar } from '@/components/AnimatedTabBar';
 import { MaterialIcons } from '@expo/vector-icons';
 
 export default function TabLayout() {
-  const colorScheme = useColorScheme();
 
   return (
     <Tabs
-		screenOptions={{
-			headerShown: false,
-			tabBarStyle: {
-				backgroundColor: colorScheme === 'dark' ? Colors.dark.background : Colors.light.background,
-				borderTopWidth: 0,
-				elevation: 0,
-				height: Platform.OS === 'ios' ? 90 : 60,
-				paddingBottom: Platform.OS === 'ios' ? 25 : 10,
-				paddingTop: 10,
-			},
-			tabBarActiveTintColor: colorScheme === 'dark' ? Colors.dark.primary : Colors.light.primary,
-			tabBarInactiveTintColor: colorScheme === 'dark' ? Colors.dark.muted : Colors.light.muted,
-			tabBarShowLabel: true,
-			tabBarLabelStyle: {
-				fontSize: 12,
-				fontWeight: '500',
-			},
-		}}
-	>
+      tabBar={(props) => <AnimatedTabBar {...props} />}
+      screenOptions={{
+        headerShown: false,
+      }}
+    >
       <Tabs.Screen
-				name="index"
-				options={{
-					title: "Home",
-					tabBarIcon: ({ color, size }) => (
-						<MaterialIcons name="home" size={size} color={color} />
-					),
-				}}
-			/>
+        name="index"
+        options={{
+          title: "Home",
+          tabBarIcon: ({ color, size }) => (
+            <MaterialIcons name="credit-card" size={size} color={color} />
+          ),
+        }}
+      />
       <Tabs.Screen
-				name="explore"
-				options={{
-					title: "Explore",
-					tabBarIcon: ({ color, size }) => (
-						<IconSymbol size={28} name="paperplane.fill" color={color} />
-					),
-				}}
-			/>
+        name="transportation"
+        options={{
+          title: "Transportation",
+          tabBarIcon: ({ color, size }) => (
+            <MaterialIcons name="directions-bus" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="food"
+        options={{
+          title: "Food",
+          tabBarIcon: ({ color, size }) => (
+            <MaterialIcons name="restaurant" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="community"
+        options={{
+          title: "Community",
+          tabBarIcon: ({ color, size }) => (
+            <MaterialIcons name="event" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="social"
+        options={{
+          title: "Social",
+          tabBarIcon: ({ color, size }) => (
+            <MaterialIcons name="people" size={size} color={color} />
+          ),
+        }}
+      />
     </Tabs>
   );
 }
