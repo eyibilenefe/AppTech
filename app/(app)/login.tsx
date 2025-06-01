@@ -92,90 +92,136 @@ export default function SignIn() {
 			</View>
 
 			<View style={styles.title}>
-				<Text className="text-4xl font-bold text-white">Login</Text>
+				<Text className="text-4xl font-bold text-white">Sign In</Text>
 			</View>
 
 
-			<View style={styles.formContainer}>
-				<ScrollView showsVerticalScrollIndicator={false}>
+			<KeyboardAvoidingView 
+                style={styles.formContainer}
+                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+            >
+				<ScrollView 
+					showsVerticalScrollIndicator={false} 
+					className="flex-1"
+					keyboardShouldPersistTaps="handled"
+					contentContainerStyle={{ flexGrow: 1, paddingBottom: 100 }}
+				>
+					{/* Form Header */}
+					<View className="mb-8">
+						<Text className="text-2xl font-bold text-gray-800 mb-2">Welcome Back</Text>
+						<Text className="text-base text-gray-500">Sign in to continue to your account</Text>
+					</View>
+
 					<Form {...form}>
-						<View style={styles.inputsContainer}>
+						<View className="flex flex-col gap-4">
+							{/* Email Field */}
 							<FormField
 								control={form.control}
 								name="email"
 								render={({ field }) => (
-									<View style={styles.inputWrapper}>
-										<View style={styles.iconContainer}>
-											<MaterialIcons name="mail-outline" size={20} color={COLORS.lightText} />
+									<View className="space-y-4">
+										<Text className="text-sm font-medium text-gray-700 ml-1">Email Address</Text>
+										<View className="relative">
+											<View className="absolute left-6 top-1/2 -translate-y-1/2 z-10">
+												<MaterialIcons name="mail-outline" size={24} color="#EF4444" />
+											</View>
+											<FormInput
+                                                style={{
+                                                    height: 56,
+                                                }}
+												className="pl-16 pr-6 bg-white border-2 border-gray-200 rounded-xl text-gray-800 placeholder:text-gray-400 focus:border-red-500 focus:bg-red-50/30 transition-colors text-base"
+												placeholder="Enter your email"
+												autoCapitalize="none"
+												autoComplete="email"
+												autoCorrect={false}
+												keyboardType="email-address"
+												keyboardAppearance="light"
+												placeholderTextColor="#9CA3AF"
+												{...field}
+											/>
 										</View>
-										<FormInput
-											style={styles.input}
-											placeholder="Email"
-											autoCapitalize="none"
-											autoComplete="email"
-											autoCorrect={false}
-											keyboardType="email-address"
-											placeholderTextColor="#999"
-											{...field}
-										/>
 									</View>
 								)}
 							/>
+
+							{/* Password Field */}
 							<FormField
 								control={form.control}
 								name="password"
 								render={({ field }) => (
-									<View style={styles.inputWrapper}>
-										<View style={styles.iconContainer}>
-											<MaterialIcons name="lock-outline" size={20} color={COLORS.lightText} />
-										</View>
-										<FormInput
-											style={styles.input}
-											placeholder="Password"
-											autoCapitalize="none"
-											autoCorrect={false}
-											secureTextEntry={!passwordVisible}
-											placeholderTextColor="#999"
-											{...field}
-										/>
-										<TouchableOpacity style={styles.rightIconContainer} onPress={togglePasswordVisibility}>
-											<MaterialIcons 
-												name={passwordVisible ? "visibility" : "visibility-off"} 
-												size={20} 
-												color={COLORS.lightText} 
+									<View className="space-y-4 mb-6">
+										<Text className="text-sm font-medium text-gray-700 ml-1">Password</Text>
+										<View className="relative">
+											<View className="absolute left-6 top-1/2 -translate-y-1/2 z-10">
+												<MaterialIcons name="lock-outline" size={24} color="#EF4444" />
+											</View>
+											<FormInput
+                                                style={{
+                                                    height: 56,
+                                                }}
+												className="pl-16 pr-16 bg-white border-2 border-gray-200 rounded-xl text-gray-800 placeholder:text-gray-400 focus:border-red-500 focus:bg-red-50/30 transition-colors text-base"
+												placeholder="Enter your password"
+												autoCapitalize="none"
+												autoCorrect={false}
+												secureTextEntry={!passwordVisible}
+												keyboardAppearance="light"
+												keyboardType="default"
+												placeholderTextColor="#9CA3AF"
+												{...field}
 											/>
-										</TouchableOpacity>
+											<TouchableOpacity 
+												className="absolute right-6 top-1/2 -translate-y-1/2 z-10 p-2" 
+												onPress={togglePasswordVisibility}
+												activeOpacity={0.7}
+											>
+												<MaterialIcons 
+													name={passwordVisible ? "visibility" : "visibility-off"} 
+													size={24} 
+													color="#6B7280" 
+												/>
+											</TouchableOpacity>
+										</View>
 									</View>
 								)}
 							/>
-
-							<View style={styles.optionsContainer}>
-								<TouchableOpacity style={styles.rememberContainer} onPress={toggleRememberMe}>
-									<View style={[styles.checkbox, rememberMe && styles.checkboxChecked]}>
-										{rememberMe && <MaterialIcons name="check" size={16} color="#fff" />}
-									</View>
-									<Text style={styles.rememberText}>Remember me</Text>
-								</TouchableOpacity>
-								<TouchableOpacity>
-									<Text style={styles.forgotText}>Forgot password?</Text>
-								</TouchableOpacity>
-							</View>
 						</View>
 					</Form>
 
-					<Button
-						style={styles.loginButton}
-						onPress={form.handleSubmit(onSubmit)}
-						disabled={form.formState.isSubmitting}
-					>
-						{form.formState.isSubmitting ? (
-							<ActivityIndicator color="#fff" size="small" />
-						) : (
-							<Text style={styles.loginButtonText}>LOGIN</Text>
-						)}
-					</Button>
+					{/* Login Button */}
+					<View className="mt-8">
+						<Button
+							className="h-14 bg-gradient-to-r from-red-500 to-red-600 rounded-xl shadow-lg shadow-red-500/25 active:scale-[0.98] transition-transform"
+							style={{
+								backgroundColor: '#EF4444',
+								shadowColor: '#EF4444',
+								shadowOffset: { width: 0, height: 4 },
+								shadowOpacity: 0.3,
+								shadowRadius: 8,
+								elevation: 8,
+							}}
+							onPress={form.handleSubmit(onSubmit)}
+							disabled={form.formState.isSubmitting}
+						>
+							{form.formState.isSubmitting ? (
+								<View className="flex-row items-center justify-center space-x-2">
+									<ActivityIndicator color="#fff" size="small" />
+									<Text className="text-white font-semibold text-base ml-2">Signing In...</Text>
+								</View>
+							) : (
+								<Text className="text-white font-semibold text-base tracking-wide">Sign In</Text>
+							)}
+						</Button>
+					</View>
+
+					{/* Forgot Password Link */}
+					<View className="mt-6 items-center">
+						<TouchableOpacity activeOpacity={0.7}>
+							<Text className="text-red-500 font-medium text-sm">Forgot your password?</Text>
+						</TouchableOpacity>
+					</View>
 				</ScrollView>
-			</View>
+			</KeyboardAvoidingView>
 		</KeyboardAvoidingView>
 	);
 }
@@ -257,7 +303,6 @@ const styles = StyleSheet.create({
 		position: 'relative',
 	},
 	input: {
-		flex: 1,
 		height: 56,
 		paddingLeft: 48,
 		paddingRight: 16,
