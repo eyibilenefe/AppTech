@@ -12,25 +12,25 @@ export default function TabLayout() {
 
   return (
     <Tabs
-			screenOptions={{
-				headerShown: false,
-				tabBarStyle: {
-					backgroundColor: colorScheme === 'dark' ? Colors.dark.background : Colors.light.background,
-					borderTopWidth: 0,
-					elevation: 0,
-					height: Platform.OS === 'ios' ? 90 : 60,
-					paddingBottom: Platform.OS === 'ios' ? 25 : 10,
-					paddingTop: 10,
-				},
-				tabBarActiveTintColor: colorScheme === 'dark' ? Colors.dark.primary : Colors.light.primary,
-				tabBarInactiveTintColor: colorScheme === 'dark' ? Colors.dark.muted : Colors.light.muted,
-				tabBarShowLabel: true,
-				tabBarLabelStyle: {
-					fontSize: 12,
-					fontWeight: '500',
-				},
-			}}
-		>
+		screenOptions={{
+			headerShown: false,
+			tabBarStyle: {
+				backgroundColor: colorScheme === 'dark' ? Colors.dark.background : Colors.light.background,
+				borderTopWidth: 0,
+				elevation: 0,
+				height: Platform.OS === 'ios' ? 90 : 60,
+				paddingBottom: Platform.OS === 'ios' ? 25 : 10,
+				paddingTop: 10,
+			},
+			tabBarActiveTintColor: colorScheme === 'dark' ? Colors.dark.primary : Colors.light.primary,
+			tabBarInactiveTintColor: colorScheme === 'dark' ? Colors.dark.muted : Colors.light.muted,
+			tabBarShowLabel: true,
+			tabBarLabelStyle: {
+				fontSize: 12,
+				fontWeight: '500',
+			},
+		}}
+	>
       <Tabs.Screen
 				name="index"
 				options={{

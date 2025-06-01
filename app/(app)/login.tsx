@@ -36,7 +36,7 @@ const formSchema = z.object({
 });
 
 export default function SignIn() {
-	const { signInWithPassword } = useSupabase();
+	const { signInWithUniversityApi, signInWithPassword } = useSupabase();
 	const [passwordVisible, setPasswordVisible] = useState(false);
 	const [rememberMe, setRememberMe] = useState(false);
 
@@ -50,10 +50,11 @@ export default function SignIn() {
 
 	async function onSubmit(data: z.infer<typeof formSchema>) {
 		try {
-			await signInWithPassword(data.email, data.password);
+			await signInWithUniversityApi(data.email, data.password);
+            // await signInWithPassword(data.email, data.password);
 			form.reset();
 		} catch (error: Error | any) {
-			console.log(error.message);
+			console.log("onSubmit error after signInWithUniversityApi:", error.message);
 		}
 	}
 
