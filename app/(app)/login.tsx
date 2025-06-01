@@ -192,13 +192,9 @@ export default function SignIn() {
 					{/* Login Button */}
 					<View className="mt-8">
 						<Button
-							className="h-14 bg-gradient-to-r from-red-500 to-red-600 rounded-xl shadow-lg shadow-red-500/25 active:scale-[0.98] transition-transform"
+							className="h-14 bg-gradient-to-r from-red-500 to-red-600 rounded-xl active:scale-[0.98] transition-transform"
 							style={{
 								backgroundColor: '#EF4444',
-								shadowColor: '#EF4444',
-								shadowOffset: { width: 0, height: 4 },
-								shadowOpacity: 0.3,
-								shadowRadius: 8,
 								elevation: 8,
 							}}
 							onPress={form.handleSubmit(onSubmit)}
@@ -244,17 +240,10 @@ const styles = StyleSheet.create({
 		left: 20,
 		width: 50,
 		height: 50,
-		backgroundColor: COLORS.background,
+		backgroundColor: 'rgba(255, 255, 255, 0.95)',
 		borderRadius: 25,
 		justifyContent: 'center',
 		alignItems: 'center',
-		shadowColor: '#000',
-		shadowOffset: {
-			width: 0,
-			height: 2,
-		},
-		shadowOpacity: 0.1,
-		shadowRadius: 4,
 		elevation: 4,
 	},
 	logo: {
@@ -274,20 +263,13 @@ const styles = StyleSheet.create({
 		bottom: 0,
 		left: 0,
 		right: 0,
-		height: height * 0.65, // Increased height to ensure form is visible
-		backgroundColor: COLORS.background,
+		height: height * 0.65,
+		backgroundColor: 'rgba(255, 255, 255, 0.98)',
 		borderTopLeftRadius: 30,
 		borderTopRightRadius: 30,
 		paddingHorizontal: 24,
 		paddingTop: 40,
 		paddingBottom: 40,
-		shadowColor: '#000',
-		shadowOffset: {
-			width: 0,
-			height: -3,
-		},
-		shadowOpacity: 0.1,
-		shadowRadius: 10,
 		elevation: 10,
 	},
 	inputsContainer: {

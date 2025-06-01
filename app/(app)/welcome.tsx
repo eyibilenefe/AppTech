@@ -270,7 +270,13 @@ export default function WelcomeScreen() {
 			
 			{/* Logo Container */}
 			<View className="absolute top-20 left-5 z-10">
-				<View className="w-16 h-16 bg-white rounded-full justify-center items-center shadow-lg">
+				<View 
+					className="w-16 h-16 bg-white rounded-full justify-center items-center"
+					style={{
+						elevation: 4,
+						backgroundColor: 'rgba(255, 255, 255, 0.95)',
+					}}
+				>
 					<Image
 						source={require("@/assets/images/logo/dc-logo-red.png")}
 						className="w-12 h-12"
@@ -336,16 +342,19 @@ export default function WelcomeScreen() {
 			{/* Button Container */}
 			<View className="absolute bottom-12 left-5 right-5 z-10">
 				{/* Button Shadow */}
-				<View className="absolute top-1 left-1 right-1 h-12 bg-black/10 rounded-full" />
+				<View 
+					className="absolute top-1 left-1 right-1 h-12 rounded-full"
+					style={{
+						backgroundColor: 'rgba(0, 0, 0, 0.1)',
+						elevation: 2,
+					}}
+				/>
 				
 				<Button
-					className="bg-white h-12 rounded-full justify-center items-center shadow-xl border border-white/20"
+					className="bg-white h-12 rounded-full justify-center items-center border border-white/20"
 					style={{
-						shadowColor: '#000',
-						shadowOffset: { width: 0, height: 6 },
-						shadowOpacity: 0.3,
-						shadowRadius: 10,
 						elevation: 12,
+						backgroundColor: 'rgba(255, 255, 255, 0.95)',
 					}}
 					onPress={() => router.push("/login")}
 				>

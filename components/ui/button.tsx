@@ -1,6 +1,6 @@
 import { cva, type VariantProps } from "class-variance-authority";
 import * as React from "react";
-import { Pressable } from "react-native";
+import { Pressable, StyleSheet } from "react-native";
 
 import { TextClassContext } from "./text";
 
@@ -64,10 +64,20 @@ const buttonTextVariants = cva(
 type ButtonProps = React.ComponentPropsWithoutRef<typeof Pressable> &
 	VariantProps<typeof buttonVariants>;
 
+const styles = StyleSheet.create({
+	defaultButton: {
+		elevation: 4,
+	},
+});
+
 const Button = React.forwardRef<
-	React.ElementRef<typeof Pressable>,
+	React.ComponentRef<typeof Pressable>,
 	ButtonProps
->(({ className, variant, size, ...props }, ref) => {
+>(({ className, variant, size, style, ...props }, ref) => {
+	const buttonStyle = React.useMemo(() => {
+		return StyleSheet.flatten([styles.defaultButton, style]);
+	}, [style]);
+
 	return (
 		<TextClassContext.Provider
 			value={buttonTextVariants({
@@ -81,6 +91,7 @@ const Button = React.forwardRef<
 					props.disabled && "opacity-50 web:pointer-events-none",
 					buttonVariants({ variant, size, className }),
 				)}
+				style={buttonStyle}
 				ref={ref}
 				role="button"
 				{...props}
