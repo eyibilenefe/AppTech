@@ -109,18 +109,18 @@ const Transportation = () => {
   const [buses, setBuses] = useState<Bus[]>([
     {
       id: 'bus1',
-      latitude: 37.78875,
-      longitude: -122.4319,
-      route: 'Route 101',
-      isMoving: true,
+      latitude: 38.3243,
+      longitude: 26.630990,
+      route: '883',
+      isMoving: false,
       passengers: 12
     },
     {
       id: 'bus2',
-      latitude: 37.79075,
-      longitude: -122.4299,
-      route: 'Route 101',
-      isMoving: false,
+      latitude: 38.32463433756970,
+      longitude: 26.635313111491,
+      route: '882',
+      isMoving: true,
       passengers: 8
     }
   ]);

@@ -5,6 +5,7 @@ import { useEffect } from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { SupabaseProvider } from '@/context/supabase-provider';
+import { ThemeProvider } from '@/context/ThemeContext';
 
 import '../global.css';
 
@@ -30,7 +31,9 @@ export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SupabaseProvider>
-        <Slot />
+        <ThemeProvider>
+          <Slot />
+        </ThemeProvider>
       </SupabaseProvider>
     </GestureHandlerRootView>
   );
