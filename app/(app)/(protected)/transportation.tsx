@@ -3,7 +3,7 @@ import BottomSheet, { BottomSheetView } from '@gorhom/bottom-sheet';
 import * as LocationExpo from 'expo-location';
 import { StatusBar } from 'expo-status-bar';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, Dimensions, StyleSheet, View } from 'react-native';
+import { Alert, Dimensions, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import MapView, { Marker, Polyline } from 'react-native-maps';
 
 import BusMarker from '@/components/BusMarker';
@@ -48,23 +48,51 @@ const Transportation = () => {
   const [locations, setLocations] = useState<Location[]>([
     {
       id: '1',
-      latitude: 37.78825,
-      longitude: -122.4324,
-      title: 'Main Bus Station',
-      type: 'station'
+      latitude: 38.3184,
+      longitude: 26.6435,
+      title: 'Rektörlük',
+      type: 'bus_stop'
     },
     {
       id: '2',
-      latitude: 37.78925,
-      longitude: -122.4314,
-      title: 'University Stop',
+      latitude: 38.3162,
+      longitude: 26.6382,
+      title: 'Yabancı Diller',
       type: 'bus_stop'
     },
     {
       id: '3',
-      latitude: 37.79125,
-      longitude: -122.4294,
-      title: 'Shopping Center',
+      latitude: 38.320425,
+      longitude: 26.639176,
+      title: 'Kütüphane',
+      type: 'bus_stop'
+    },
+    {
+      id: '4',
+      latitude: 38.3234,
+      longitude: 26.6399,
+      title: 'Şenlik Alanı',
+      type: 'bus_stop'
+    },
+    {
+      id: '5',
+      latitude: 38.32463433756970,
+      longitude: 26.635313111491,
+      title: 'Yurtlar',
+      type: 'bus_stop'
+    },
+    {
+      id: '6',
+      latitude: 38.3245,
+      longitude: 26.6353,
+      title: 'Yurtlar',
+      type: 'bus_stop'
+    },
+    {
+      id: '7',
+      latitude: 38.324254,
+      longitude: 26.630990,
+      title: 'İYTE Son Durak',
       type: 'bus_stop'
     }
   ]);
@@ -341,129 +369,107 @@ const Transportation = () => {
         handleIndicatorStyle={styles.bottomSheetIndicator}
       >
         <BottomSheetView style={styles.bottomSheetContent}>
-          <View style={styles.bottomSheetHeader}>
-            <Text className="text-2xl font-bold text-foreground">Transportation Hub</Text>
-            <Text className="text-sm text-muted-foreground mt-1">
-              Manage routes, stops, and transportation options
-            </Text>
+          {/* Header with Route Buttons and Settings */}
+          <View style={styles.timetableHeader}>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              style={styles.routeButtons}
+              contentContainerStyle={styles.routeButtons}
+            >
+              <Pressable style={[styles.routeButton, styles.activeRoute]}>
+                <Text style={styles.routeButtonText}>883</Text>
+              </Pressable>
+              <Pressable style={styles.routeButton}>
+                <Text style={styles.routeButtonTextInactive}>882</Text>
+              </Pressable>
+              <Pressable style={styles.routeButton}>
+                <Text style={styles.routeButtonTextInactive}>982</Text>
+              </Pressable>
+              <Pressable style={styles.routeButton}>
+                <Text style={styles.routeButtonTextInactive}>981</Text>
+              </Pressable>
+              <Pressable style={styles.routeButton}>
+                <Text style={styles.routeButtonTextInactive}>760</Text>
+              </Pressable>
+              <Pressable style={styles.routeButton}>
+                <Text style={styles.routeButtonTextInactive}>Ring</Text>
+              </Pressable>
+            </ScrollView>
           </View>
 
-          {/* Edit Mode Status */}
-          {editMode !== 'none' && (
-            <View style={styles.editModeBar}>
-              <Text className="text-sm font-medium text-white">
-                {editMode === 'add_location' 
-                  ? 'Tap on map to add location' 
-                  : `Drawing route (${currentRoute.length} points)`
-                }
-              </Text>
-              {editMode === 'add_route' && currentRoute.length > 1 && (
-                <View style={styles.routeActions}>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onPress={finishRoute}
-                    style={styles.routeButton}
-                  >
-                    <Text className="text-xs">Finish Route</Text>
-                  </Button>
-                  <Button
-                    variant="destructive"
-                    size="sm"
-                    onPress={clearCurrentRoute}
-                    style={styles.routeButton}
-                  >
-                    <Text className="text-xs">Cancel</Text>
-                  </Button>
-                </View>
-              )}
-            </View>
-          )}
-
-          {/* Action Buttons */}
-          <View style={styles.actionGrid}>
-            <Button
-              variant={editMode === 'add_location' ? 'default' : 'outline'}
-              style={styles.actionButton}
-              onPress={() => setEditMode(editMode === 'add_location' ? 'none' : 'add_location')}
-            >
-              <Ionicons name="add-circle" size={20} color={editMode === 'add_location' ? 'white' : '#007AFF'} />
-              <Text className={`text-sm font-medium ml-2 ${editMode === 'add_location' ? 'text-white' : 'text-foreground'}`}>
-                Add Stop
-              </Text>
-            </Button>
-
-            <Button
-              variant={editMode === 'add_route' ? 'default' : 'outline'}
-              style={styles.actionButton}
-              onPress={() => setEditMode(editMode === 'add_route' ? 'none' : 'add_route')}
-            >
-              <Ionicons name="trail-sign" size={20} color={editMode === 'add_route' ? 'white' : '#007AFF'} />
-              <Text className={`text-sm font-medium ml-2 ${editMode === 'add_route' ? 'text-white' : 'text-foreground'}`}>
-                Add Route
-              </Text>
-            </Button>
-
-            <Button
-              variant={showBuses ? 'default' : 'outline'}
-              style={styles.actionButton}
-              onPress={toggleBusVisibility}
-            >
-              <Ionicons name="bus" size={20} color={showBuses ? 'white' : '#007AFF'} />
-              <Text className={`text-sm font-medium ml-2 ${showBuses ? 'text-white' : 'text-foreground'}`}>
-                Live Buses
-              </Text>
-            </Button>
-
-            <Button
-              variant="outline"
-              style={styles.actionButton}
-              onPress={() => {/* Handle schedule */}}
-            >
-              <Ionicons name="time" size={20} color="#007AFF" />
-              <Text className="text-sm font-medium ml-2 text-foreground">
-                Schedules
-              </Text>
-            </Button>
+          {/* Route Display */}
+          <View style={styles.routeDisplay}>
+            <Text style={styles.routeText}>İYTE → F. Altıyol</Text>
+            <Pressable style={styles.directionButton}>
+              <Ionicons name="swap-horizontal" size={20} color="#007AFF" />
+            </Pressable>
           </View>
 
-          {/* Statistics */}
-          <View style={styles.statsContainer}>
-            <View style={styles.statItem}>
-              <Text className="text-2xl font-bold text-foreground">{locations.length}</Text>
-              <Text className="text-sm text-muted-foreground">Locations</Text>
-            </View>
-            <View style={styles.statItem}>
-              <Text className="text-2xl font-bold text-foreground">{routes.length}</Text>
-              <Text className="text-sm text-muted-foreground">Routes</Text>
-            </View>
-            <View style={styles.statItem}>
-              <Text className="text-2xl font-bold text-foreground">{buses.length}</Text>
-              <Text className="text-sm text-muted-foreground">Active Buses</Text>
-            </View>
+          {/* Date Selector */}
+          <View style={styles.dateSelector}>
+            <Pressable style={styles.dateArrow}>
+              <Ionicons name="chevron-back" size={20} color="#666" />
+            </Pressable>
+            <Text style={styles.dateText}>Today</Text>
+            <Pressable style={styles.dateArrow}>
+              <Ionicons name="chevron-forward" size={20} color="#666" />
+            </Pressable>
           </View>
 
-          {/* Recent Locations */}
-          <View style={styles.recentSection}>
-            <Text className="text-lg font-semibold text-foreground mb-3">Recent Locations</Text>
-            {locations.slice(-3).map((location) => (
-              <View key={location.id} style={styles.locationItem}>
-                <View style={[styles.locationIcon, 
-                  location.type === 'station' ? styles.stationMarker : styles.busStopMarker
-                ]}>
-                  <Ionicons name={getMarkerIcon(location.type) as any} size={16} color="white" />
-                </View>
-                <View style={styles.locationInfo}>
-                  <Text className="text-sm font-medium text-foreground">{location.title}</Text>
-                  <Text className="text-xs text-muted-foreground">
-                    {location.type === 'station' ? 'Train Station' : 'Bus Stop'}
-                  </Text>
-                </View>
-                <Button variant="ghost" size="icon">
-                  <Ionicons name="chevron-forward" size={16} color="#666" />
-                </Button>
+          {/* Timetable Content */}
+          <ScrollView style={styles.timetableContainer} showsVerticalScrollIndicator={false}>
+            <View style={styles.timetableRow}>
+              {/* Left Column - Timetable */}
+              <View style={styles.timetableColumn}>
+                <Text style={styles.columnHeader}>Departure Times</Text>
+                {['10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00'].map((time, index) => (
+                  <View key={index} style={styles.timeItem}>
+                    <Ionicons name="time" size={16} color="#666" />
+                    <Text style={styles.timeText}>{time}</Text>
+                  </View>
+                ))}
               </View>
-            ))}
+
+              {/* Right Column - Bus Stops */}
+              <View style={styles.stopsColumn}>
+                <Text style={styles.columnHeader}>Bus Stops</Text>
+                {[
+                  'Mimarlık',
+                  'Fen',
+                  'KYK',
+                  'Şehit A',
+                  'Kütüphane',
+                  'Hazırlık',
+                  'Mühendislik',
+                  'Rektörlük'
+                ].map((stop, index) => (
+                  <View key={index} style={styles.stopItem}>
+                    <Ionicons name="location" size={16} color="#4ECDC4" />
+                    <Text style={styles.stopText}>{stop}</Text>
+                  </View>
+                ))}
+              </View>
+            </View>
+          </ScrollView>
+
+          {/* Bottom Navigation */}
+          <View style={styles.bottomNavigation}>
+            <Pressable style={styles.navItem}>
+              <Ionicons name="home" size={24} color="#007AFF" />
+            </Pressable>
+            <Pressable style={styles.navItem}>
+              <Ionicons name="map" size={24} color="#666" />
+            </Pressable>
+            <Pressable style={styles.navItem}>
+              <Ionicons name="bus" size={24} color="#666" />
+            </Pressable>
+            <Pressable style={styles.navItem}>
+              <Ionicons name="time" size={24} color="#666" />
+            </Pressable>
+            <Pressable style={styles.navItem}>
+              <Ionicons name="person" size={24} color="#666" />
+            </Pressable>
           </View>
         </BottomSheetView>
       </BottomSheet>
@@ -562,71 +568,138 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingBottom: 20,
   },
-  bottomSheetHeader: {
-    marginBottom: 20,
-  },
-  editModeBar: {
-    backgroundColor: '#007AFF',
-    borderRadius: 10,
-    padding: 12,
-    marginBottom: 20,
+  timetableHeader: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 20,
   },
-  routeActions: {
+  routeButtons: {
     flexDirection: 'row',
     gap: 8,
   },
   routeButton: {
-    minWidth: 80,
-  },
-  actionGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-    marginBottom: 24,
-  },
-  actionButton: {
-    flex: 1,
-    minWidth: '45%',
-    flexDirection: 'row',
-    justifyContent: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderWidth: 1,
+    borderColor: '#007AFF',
+    borderRadius: 8,
+    minWidth: 50,
     alignItems: 'center',
+  },
+  activeRoute: {
+    backgroundColor: '#007AFF',
+  },
+  routeButtonText: {
+    color: 'white',
+    fontWeight: 'bold',
+    fontSize: 14,
+  },
+  routeButtonTextInactive: {
+    color: '#007AFF',
+    fontWeight: 'bold',
+    fontSize: 14,
+  },
+  settingsButton: {
+    padding: 8,
+  },
+  routeDisplay: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 20,
     paddingHorizontal: 16,
     paddingVertical: 12,
+    backgroundColor: '#F8F9FA',
+    borderRadius: 8,
   },
-  statsContainer: {
+  routeText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  directionButton: {
+    padding: 8,
+  },
+  dateSelector: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 20,
+    gap: 20,
+  },
+  dateArrow: {
+    padding: 8,
+  },
+  dateText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  timetableContainer: {
+    flex: 1,
+    marginBottom: 20,
+  },
+  timetableRow: {
+    flexDirection: 'row',
+    gap: 20,
+  },
+  timetableColumn: {
+    flex: 1,
+  },
+  stopsColumn: {
+    flex: 1,
+  },
+  columnHeader: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 12,
+    color: '#333',
+    textAlign: 'center',
+  },
+  timeItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: '#F8F9FA',
+    borderRadius: 6,
+    gap: 8,
+  },
+  timeText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#333',
+  },
+  stopItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: '#F8F9FA',
+    borderRadius: 6,
+    gap: 8,
+  },
+  stopText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#333',
+  },
+  bottomNavigation: {
     flexDirection: 'row',
     justifyContent: 'space-around',
-    marginBottom: 24,
-    paddingVertical: 16,
-    backgroundColor: '#F8F9FA',
-    borderRadius: 12,
-  },
-  statItem: {
-    alignItems: 'center',
-  },
-  recentSection: {
-    flex: 1,
-  },
-  locationItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
     paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
+    borderTopWidth: 1,
+    borderTopColor: '#E5E5E5',
+    backgroundColor: 'white',
   },
-  locationIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    justifyContent: 'center',
+  navItem: {
+    padding: 8,
+    borderRadius: 20,
     alignItems: 'center',
-    marginRight: 12,
-  },
-  locationInfo: {
-    flex: 1,
+    justifyContent: 'center',
   },
 });
 
