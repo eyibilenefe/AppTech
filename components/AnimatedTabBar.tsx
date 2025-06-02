@@ -226,42 +226,50 @@ export const AnimatedTabBar: React.FC<BottomTabBarProps> = ({
           height: '100%',
         }}
       >
-        {state.routes.map((route: any, index: number) => {
-          const { options } = descriptors[route.key];
-          const isFocused = state.index === index;
+        {state.routes
+          .filter((route: any) => [
+            'index',
+            'transportation',
+            'food',
+            'community',
+            'social',
+          ].includes(route.name))
+          .map((route: any, index: number) => {
+            const { options } = descriptors[route.key];
+            const isFocused = state.index === index;
 
-          const onPress = () => {
-            const event = navigation.emit({
-              type: 'tabPress',
-              target: route.key,
-              canPreventDefault: true,
-            });
+            const onPress = () => {
+              const event = navigation.emit({
+                type: 'tabPress',
+                target: route.key,
+                canPreventDefault: true,
+              });
 
-            if (!isFocused && !event.defaultPrevented) {
-              navigation.navigate(route.name, route.params);
-            }
-          };
+              if (!isFocused && !event.defaultPrevented) {
+                navigation.navigate(route.name, route.params);
+              }
+            };
 
-          const onLongPress = () => {
-            navigation.emit({
-              type: 'tabLongPress',
-              target: route.key,
-            });
-          };
+            const onLongPress = () => {
+              navigation.emit({
+                type: 'tabLongPress',
+                target: route.key,
+              });
+            };
 
-          return (
-            <TabItem
-              key={route.key}
-              route={route}
-              index={index}
-              isFocused={isFocused}
-              onPress={onPress}
-              onLongPress={onLongPress}
-              colorScheme={colorScheme}
-              animatedValue={animatedValues[index]}
-            />
-          );
-        })}
+            return (
+              <TabItem
+                key={route.key}
+                route={route}
+                index={index}
+                isFocused={isFocused}
+                onPress={onPress}
+                onLongPress={onLongPress}
+                colorScheme={colorScheme}
+                animatedValue={animatedValues[index]}
+              />
+            );
+          })}
       </View>
     </View>
   );
