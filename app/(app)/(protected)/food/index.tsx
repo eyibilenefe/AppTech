@@ -2,14 +2,14 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import {
-  Dimensions,
-  FlatList,
-  SafeAreaView,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View
+    Dimensions,
+    FlatList,
+    SafeAreaView,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View
 } from 'react-native';
 
 interface Restaurant {
@@ -56,7 +56,7 @@ const dummyAnnouncements: Announcement[] = [
     title: 'Extended Hours',
     subtitle: 'Weekend Special',
     description: 'Campus Cafeteria now open until midnight on weekends',
-    backgroundColor: '#007AFF',
+    backgroundColor: '#9a0f21',
     icon: 'access-time',
   },
   {
@@ -240,7 +240,7 @@ const FoodHomeScreen = () => {
                           style={styles.addToCartButton}
                           onPress={() => handleAddToCart(item, restaurant.name)}
                         >
-                          <MaterialIcons name="add-shopping-cart" size={20} color="#007AFF" />
+                          <MaterialIcons name="add-shopping-cart" size={20} color="#9a0f21" />
                         </TouchableOpacity>
                       </View>
                     ))}
@@ -470,7 +470,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   activeToggleButton: {
-    backgroundColor: '#007AFF',
+    backgroundColor: '#9a0f21',
   },
   toggleText: {
     fontSize: 16,
@@ -500,7 +500,7 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   activeDateCard: {
-    backgroundColor: '#007AFF',
+    backgroundColor: '#9a0f21',
   },
   dateText: {
     fontSize: 14,
@@ -600,7 +600,7 @@ const styles = StyleSheet.create({
   menuItemPrice: {
     fontSize: 14,
     fontWeight: 'bold',
-    color: '#007AFF',
+    color: '#9a0f21',
   },
   addToCartButton: {
     padding: 8,
@@ -609,7 +609,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     bottom: 120,
     right: 16,
-    backgroundColor: '#007AFF',
+    backgroundColor: '#9a0f21',
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,

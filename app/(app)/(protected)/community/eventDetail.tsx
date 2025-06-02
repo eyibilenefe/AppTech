@@ -12,7 +12,7 @@ import {
 
 // Community data for lookup
 const communitiesLookup: Record<string, { name: string; logo: string; color: string }> = {
-  'cs': { name: 'Computer Science', logo: '💻', color: '#4285f4' },
+  'cs': { name: 'Computer Science', logo: '💻', color: '#9a0f21' },
   'engineering': { name: 'Engineering', logo: '⚙️', color: '#ff6b35' },
   'sports': { name: 'Sports Club', logo: '⚽', color: '#34a853' },
   'music': { name: 'Music Society', logo: '🎵', color: '#9c27b0' },
@@ -185,7 +185,7 @@ const EventDetailScreen = () => {
           </TouchableOpacity>
           
           <TouchableOpacity style={styles.calendarButton} onPress={handleAddToCalendar}>
-            <MaterialIcons name="calendar-today" size={20} color="#007bff" />
+            <MaterialIcons name="calendar-today" size={20} color="#9a0f21" />
             <Text style={styles.calendarButtonText}>Add to Calendar</Text>
           </TouchableOpacity>
         </View>
@@ -352,7 +352,7 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   joinButton: {
-    backgroundColor: '#007bff',
+    backgroundColor: '#9a0f21',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -378,10 +378,10 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     borderRadius: 12,
     borderWidth: 2,
-    borderColor: '#007bff',
+    borderColor: '#9a0f21',
   },
   calendarButtonText: {
-    color: '#007bff',
+    color: '#9a0f21',
     fontSize: 16,
     fontWeight: '600',
     marginLeft: 8,

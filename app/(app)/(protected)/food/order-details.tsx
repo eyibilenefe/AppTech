@@ -148,7 +148,7 @@ const OrderDetails = () => {
                 >
                   <Text style={styles.dropdownItemText}>{location}</Text>
                   {selectedLocation === location && (
-                    <MaterialIcons name="check" size={20} color="#007AFF" />
+                    <MaterialIcons name="check" size={20} color="#9a0f21" />
                   )}
                 </TouchableOpacity>
               ))}
@@ -361,7 +361,7 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   selectedPaymentOption: {
-    borderColor: '#007AFF',
+    borderColor: '#9a0f21',
     backgroundColor: '#f0f8ff',
   },
   radioButton: {
@@ -377,7 +377,7 @@ const styles = StyleSheet.create({
     width: 10,
     height: 10,
     borderRadius: 5,
-    backgroundColor: '#007AFF',
+    backgroundColor: '#9a0f21',
   },
   paymentOptionText: {
     fontSize: 14,
@@ -426,7 +426,7 @@ const styles = StyleSheet.create({
   summaryItemPrice: {
     fontSize: 14,
     fontWeight: 'bold',
-    color: '#007AFF',
+    color: '#9a0f21',
   },
   summaryDivider: {
     height: 1,
@@ -466,7 +466,7 @@ const styles = StyleSheet.create({
   totalValue: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#007AFF',
+    color: '#9a0f21',
   },
   buttonContainer: {
     padding: 16,
@@ -475,7 +475,7 @@ const styles = StyleSheet.create({
     borderTopColor: '#e0e0e0',
   },
   confirmButton: {
-    backgroundColor: '#007AFF',
+    backgroundColor: '#9a0f21',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',

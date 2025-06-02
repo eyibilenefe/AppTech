@@ -167,7 +167,7 @@ const CommunitiesList: React.FC<CommunitiesListProps> = ({
           <Text style={styles.communityName}>{item.name}</Text>
           {item.isFollowing && (
             <View style={styles.followingBadge}>
-              <MaterialIcons name="check-circle" size={16} color="#007bff" />
+              <MaterialIcons name="check-circle" size={16} color="#9a0f21" />
               <Text style={styles.followingText}>Following</Text>
             </View>
           )}
@@ -330,7 +330,7 @@ const styles = StyleSheet.create({
   sectionHeaderText: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#007bff',
+    color: '#9a0f21',
   },
   communityCard: {
     flexDirection: 'row',
@@ -377,7 +377,7 @@ const styles = StyleSheet.create({
   },
   followingText: {
     fontSize: 12,
-    color: '#007bff',
+    color: '#9a0f21',
     fontWeight: '500',
     marginLeft: 4,
   },
@@ -402,7 +402,7 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
   },
   selectedAlphabetItem: {
-    backgroundColor: '#007bff',
+    backgroundColor: '#9a0f21',
     borderRadius: 10,
     width: 20,
     height: 20,

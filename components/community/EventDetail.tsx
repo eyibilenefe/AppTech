@@ -144,7 +144,7 @@ const EventDetail: React.FC<EventDetailProps> = ({
               style={styles.secondaryButton}
               onPress={handleAddToCalendar}
             >
-              <MaterialIcons name="event" size={20} color="#007bff" />
+              <MaterialIcons name="event" size={20} color="#9a0f21" />
               <Text style={styles.secondaryButtonText}>Add to Calendar</Text>
             </TouchableOpacity>
 
@@ -152,7 +152,7 @@ const EventDetail: React.FC<EventDetailProps> = ({
               style={styles.secondaryButton}
               onPress={handleShare}
             >
-              <MaterialIcons name="share" size={20} color="#007bff" />
+              <MaterialIcons name="share" size={20} color="#9a0f21" />
               <Text style={styles.secondaryButtonText}>Share Event</Text>
             </TouchableOpacity>
           </View>
@@ -271,7 +271,7 @@ const styles = StyleSheet.create({
   communityName: {
     fontSize: 16,
     fontWeight: '500',
-    color: '#007bff',
+    color: '#9a0f21',
     flex: 1,
   },
   tagsContainer: {
@@ -286,7 +286,7 @@ const styles = StyleSheet.create({
   },
   tagText: {
     fontSize: 12,
-    color: '#007bff',
+    color: '#9a0f21',
     fontWeight: '500',
   },
   detailsContainer: {
@@ -342,7 +342,7 @@ const styles = StyleSheet.create({
   },
   secondaryButtonText: {
     fontSize: 14,
-    color: '#007bff',
+    color: '#9a0f21',
     fontWeight: '500',
     marginLeft: 8,
   },
@@ -370,7 +370,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#007bff',
+    backgroundColor: '#9a0f21',
     paddingVertical: 16,
     borderRadius: 12,
   },

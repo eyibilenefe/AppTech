@@ -50,7 +50,7 @@ const communitiesData: Record<string, Community> = {
     description: 'Programming, hackathons, and tech discussions',
     memberCount: 234,
     isFollowing: true,
-    bannerColor: '#4285f4',
+    bannerColor: '#9a0f21',
     eventCount: 8,
     aboutText: 'The Computer Science Club is dedicated to fostering a community of passionate programmers, developers, and tech enthusiasts. We organize hackathons, coding workshops, tech talks, and networking events throughout the academic year.',
     contactInfo: {

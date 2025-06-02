@@ -140,7 +140,7 @@ const RestaurantDetail = () => {
                         style={styles.addToCartButton}
                         onPress={() => handleAddToCart(item)}
                       >
-                        <MaterialIcons name="add-shopping-cart" size={24} color="#007AFF" />
+                        <MaterialIcons name="add-shopping-cart" size={24} color="#9a0f21" />
                       </TouchableOpacity>
                     </View>
                   ))}
@@ -161,7 +161,7 @@ const RestaurantDetail = () => {
           </TouchableOpacity>
 
           <TouchableOpacity style={[styles.actionButton, styles.secondaryButton]}>
-            <MaterialIcons name="directions" size={24} color="#007AFF" />
+            <MaterialIcons name="directions" size={24} color="#9a0f21" />
             <Text style={[styles.actionButtonText, styles.secondaryButtonText]}>Get Directions</Text>
           </TouchableOpacity>
         </View>
@@ -282,7 +282,7 @@ const styles = StyleSheet.create({
   menuItemPrice: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#007AFF',
+    color: '#9a0f21',
   },
   addToCartButton: {
     padding: 8,
@@ -293,7 +293,7 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   actionButton: {
-    backgroundColor: '#007AFF',
+    backgroundColor: '#9a0f21',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -309,10 +309,10 @@ const styles = StyleSheet.create({
   secondaryButton: {
     backgroundColor: 'transparent',
     borderWidth: 2,
-    borderColor: '#007AFF',
+    borderColor: '#9a0f21',
   },
   secondaryButtonText: {
-    color: '#007AFF',
+    color: '#9a0f21',
   },
   bottomSpacing: {
     height: 100,

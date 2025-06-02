@@ -205,7 +205,7 @@ const styles = StyleSheet.create({
   },
   mealItemCalories: {
     fontSize: 12,
-    color: '#007AFF',
+    color: '#9a0f21',
     fontWeight: '600',
   },
   mealItemDivider: {
@@ -256,7 +256,7 @@ const styles = StyleSheet.create({
     color: '#666',
   },
   reviewsButton: {
-    backgroundColor: '#007AFF',
+    backgroundColor: '#9a0f21',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',

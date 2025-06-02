@@ -5,11 +5,11 @@ import { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import * as Haptics from 'expo-haptics';
 import React from 'react';
 import {
-    Animated,
-    Dimensions,
-    Platform,
-    TouchableOpacity,
-    View,
+  Animated,
+  Dimensions,
+  Platform,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 

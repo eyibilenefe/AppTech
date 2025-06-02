@@ -1,62 +1,35 @@
-import { useSupabase } from '@/context/supabase-provider';
-import { useRouter } from 'expo-router';
-import { Alert, Button, StyleSheet, Text, View } from 'react-native';
+import { createStackNavigator } from '@react-navigation/stack';
+import React from 'react';
+import AiChatScreen from './home/ai-chat';
+import CafeteriaReservationScreen from './home/cafeteria-reservation';
+import CalendarScreen from './home/calendar';
+import FacilityReservationScreen from './home/facility-reservation';
+import HomeScreen from './home/index';
+import ProfileScreen from './home/profile';
+import QrPaymentScreen from './home/qr-payment';
+import SettingsScreen from './home/settings';
+import TopUpScreen from './home/top-up';
 
-export default function HomeScreen() {
-  const { signOut } = useSupabase();
-  const router = useRouter();
+const Stack = createStackNavigator();
 
-  const handleLogout = async () => {
-    try {
-      await signOut();
-      // Navigation to login or welcome screen is handled by the SupabaseProvider's useEffect
-      // based on session state change.
-    } catch (error: any) {
-      Alert.alert("Logout Failed", error.message);
-    }
-  };
-
+const Home = () => {
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Hello</Text>
-      <View style={styles.buttonContainer}>
-        <Button title="Logout" onPress={handleLogout} color="#E53935" />
-      </View>
-    </View>
+    <Stack.Navigator
+      screenOptions={{
+        headerShown: false,
+      }}
+    >
+      <Stack.Screen name="index" component={HomeScreen} />
+      <Stack.Screen name="calendar" component={CalendarScreen} />
+      <Stack.Screen name="facility-reservation" component={FacilityReservationScreen} />
+      <Stack.Screen name="cafeteria-reservation" component={CafeteriaReservationScreen} />
+      <Stack.Screen name="top-up" component={TopUpScreen} />
+      <Stack.Screen name="qr-payment" component={QrPaymentScreen} />
+      <Stack.Screen name="settings" component={SettingsScreen} />
+      <Stack.Screen name="profile" component={ProfileScreen} />
+      <Stack.Screen name="ai-chat" component={AiChatScreen} />
+    </Stack.Navigator>
   );
-}
+};
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 16,
-    backgroundColor: '#f0f0f0',
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 20,
-  },
-  buttonContainer: {
-    marginTop: 20,
-    width: '80%',
-  },
-  titleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  stepContainer: {
-    gap: 8,
-    marginBottom: 8,
-  },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
-  },
-});
+export default Home;

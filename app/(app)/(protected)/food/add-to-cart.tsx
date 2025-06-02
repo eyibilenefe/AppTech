@@ -107,7 +107,7 @@ const AddToCart = () => {
         {/* Item Info */}
         <View style={styles.itemCard}>
           <View style={styles.itemHeader}>
-            <MaterialIcons name="restaurant-menu" size={48} color="#007AFF" />
+            <MaterialIcons name="restaurant-menu" size={48} color="#9a0f21" />
           </View>
           
           <Text style={styles.itemName}>{item.name}</Text>
@@ -133,7 +133,7 @@ const AddToCart = () => {
               <MaterialIcons 
                 name="remove" 
                 size={24} 
-                color={quantity === 1 ? "#ccc" : "#007AFF"} 
+                color={quantity === 1 ? "#ccc" : "#9a0f21"} 
               />
             </TouchableOpacity>
             
@@ -145,7 +145,7 @@ const AddToCart = () => {
               style={styles.quantityButton}
               onPress={incrementQuantity}
             >
-              <MaterialIcons name="add" size={24} color="#007AFF" />
+              <MaterialIcons name="add" size={24} color="#9a0f21" />
             </TouchableOpacity>
           </View>
         </View>
@@ -252,7 +252,7 @@ const styles = StyleSheet.create({
   itemPrice: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#007AFF',
+    color: '#9a0f21',
     marginBottom: 12,
   },
   itemDescription: {
@@ -337,10 +337,10 @@ const styles = StyleSheet.create({
   totalValue: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#007AFF',
+    color: '#9a0f21',
   },
   addButton: {
-    backgroundColor: '#007AFF',
+    backgroundColor: '#9a0f21',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',

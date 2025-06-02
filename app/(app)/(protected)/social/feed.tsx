@@ -3,15 +3,15 @@ import { useNavigation } from '@react-navigation/native';
 import * as Haptics from 'expo-haptics';
 import React, { useRef, useState } from 'react';
 import {
-  Animated,
-  Image,
-  SafeAreaView,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
+    Animated,
+    Image,
+    SafeAreaView,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -382,7 +382,7 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
     borderRadius: 28,
-    backgroundColor: '#007AFF',
+    backgroundColor: '#9a0f21',
     justifyContent: 'center',
     alignItems: 'center',
   },

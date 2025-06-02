@@ -2,13 +2,13 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import {
-  Alert,
-  SafeAreaView,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
+    Alert,
+    SafeAreaView,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from 'react-native';
 
 interface CartItem {
@@ -139,7 +139,7 @@ const Cart = () => {
           style={styles.quantityButton}
           onPress={() => handleQuantityChange(item.id, item.quantity - 1)}
         >
-          <MaterialIcons name="remove" size={20} color="#007AFF" />
+          <MaterialIcons name="remove" size={20} color="#9a0f21" />
         </TouchableOpacity>
 
         <Text style={styles.quantityText}>{item.quantity}</Text>
@@ -148,7 +148,7 @@ const Cart = () => {
           style={styles.quantityButton}
           onPress={() => handleQuantityChange(item.id, item.quantity + 1)}
         >
-          <MaterialIcons name="add" size={20} color="#007AFF" />
+          <MaterialIcons name="add" size={20} color="#9a0f21" />
         </TouchableOpacity>
       </View>
 
@@ -208,7 +208,7 @@ const Cart = () => {
         {Object.entries(groupedItems).map(([restaurantName, items]) => (
           <View key={restaurantName} style={styles.restaurantSection}>
             <View style={styles.restaurantHeader}>
-              <MaterialIcons name="restaurant" size={20} color="#007AFF" />
+              <MaterialIcons name="restaurant" size={20} color="#9a0f21" />
               <Text style={styles.restaurantName}>{restaurantName}</Text>
             </View>
 
@@ -316,7 +316,7 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   browseButton: {
-    backgroundColor: '#007AFF',
+    backgroundColor: '#9a0f21',
     paddingHorizontal: 24,
     paddingVertical: 12,
     borderRadius: 8,
@@ -362,7 +362,7 @@ const styles = StyleSheet.create({
   itemPrice: {
     fontSize: 14,
     fontWeight: 'bold',
-    color: '#007AFF',
+    color: '#9a0f21',
   },
   quantityControls: {
     flexDirection: 'row',
@@ -443,7 +443,7 @@ const styles = StyleSheet.create({
   totalValue: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#007AFF',
+    color: '#9a0f21',
   },
   actionButtons: {
     flexDirection: 'row',
@@ -470,7 +470,7 @@ const styles = StyleSheet.create({
   },
   orderButton: {
     flex: 1,
-    backgroundColor: '#007AFF',
+    backgroundColor: '#9a0f21',
     paddingVertical: 16,
     borderRadius: 8,
     alignItems: 'center',

@@ -17,7 +17,7 @@ interface BusMarkerProps {
 
 const BusMarker: React.FC<BusMarkerProps> = ({ 
   size = 30, 
-  color = '#007AFF',
+  color = '#9a0f21',
   isMoving = false 
 }) => {
   const animationValue = useSharedValue(0);

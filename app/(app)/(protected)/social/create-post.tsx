@@ -2,15 +2,15 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import React, { useState } from 'react';
 import {
-    Image,
-    SafeAreaView,
-    ScrollView,
-    StyleSheet,
-    Switch,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  Image,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Switch,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 
 const CreatePostScreen = () => {
@@ -75,7 +75,7 @@ const CreatePostScreen = () => {
                 <Switch
                   value={isAnonymous}
                   onValueChange={setIsAnonymous}
-                  trackColor={{ false: '#d3d3d3', true: '#007AFF' }}
+                  trackColor={{ false: '#d3d3d3', true: '#9a0f21' }}
                   thumbColor={isAnonymous ? '#ffffff' : '#f4f3f4'}
                 />
               </View>
@@ -179,7 +179,7 @@ const styles = StyleSheet.create({
     color: '#666',
   },
   postButton: {
-    backgroundColor: '#007AFF',
+    backgroundColor: '#9a0f21',
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 16,
@@ -324,7 +324,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#007AFF',
+    backgroundColor: '#9a0f21',
     paddingVertical: 12,
     borderRadius: 24,
   },

@@ -43,7 +43,7 @@ const mockCommunity: CommunityData = {
   description: 'A community for computer science students and enthusiasts. We organize workshops, hackathons, coding competitions, and tech talks. Join us to learn, collaborate, and advance your programming skills while connecting with like-minded individuals.',
   memberCount: 234,
   isFollowing: true,
-  bannerColor: '#4285f4',
+  bannerColor: '#9a0f21',
   eventCount: 12,
 };
 
@@ -62,7 +62,7 @@ const mockEvent: EventData = {
   tags: ['Workshop', 'Mobile Development', 'React Native', 'Programming'],
   attendeeCount: 45,
   isJoined: false,
-  posterColor: '#667eea',
+  posterColor: '#9a0f21',
 };
 
 const CommunityDemo: React.FC = () => {

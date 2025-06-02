@@ -245,7 +245,7 @@ const styles = StyleSheet.create({
   },
   clearText: {
     fontSize: 16,
-    color: '#007bff',
+    color: '#9a0f21',
     fontWeight: '500',
   },
   content: {
@@ -283,7 +283,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   selectedFollowStatus: {
-    backgroundColor: '#007bff',
+    backgroundColor: '#9a0f21',
   },
   followStatusText: {
     fontSize: 12,
@@ -322,7 +322,7 @@ const styles = StyleSheet.create({
     borderColor: 'transparent',
   },
   selectedCommunityLogo: {
-    borderColor: '#007bff',
+    borderColor: '#9a0f21',
     backgroundColor: '#e3f2fd',
   },
   communityLogoText: {
@@ -343,7 +343,7 @@ const styles = StyleSheet.create({
     width: 18,
     height: 18,
     borderRadius: 9,
-    backgroundColor: '#007bff',
+    backgroundColor: '#9a0f21',
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 2,
@@ -364,7 +364,7 @@ const styles = StyleSheet.create({
     minHeight: 40,
   },
   selectedEventType: {
-    backgroundColor: '#007bff',
+    backgroundColor: '#9a0f21',
   },
   eventTypeText: {
     fontSize: 14,
@@ -384,7 +384,7 @@ const styles = StyleSheet.create({
     borderTopColor: '#f0f0f0',
   },
   applyButton: {
-    backgroundColor: '#007bff',
+    backgroundColor: '#9a0f21',
     paddingVertical: 16,
     borderRadius: 12,
     alignItems: 'center',

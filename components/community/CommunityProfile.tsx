@@ -133,7 +133,7 @@ const CommunityProfile: React.FC<CommunityProfileProps> = ({
             <MaterialIcons 
               name={isFollowing ? "check" : "add"} 
               size={20} 
-              color={isFollowing ? "#007bff" : "#fff"} 
+              color={isFollowing ? "#9a0f21" : "#fff"} 
             />
             <Text style={[
               styles.followButtonText,
@@ -292,7 +292,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#007bff',
+    backgroundColor: '#9a0f21',
     paddingHorizontal: 24,
     paddingVertical: 12,
     borderRadius: 24,
@@ -301,7 +301,7 @@ const styles = StyleSheet.create({
   followingButton: {
     backgroundColor: '#e3f2fd',
     borderWidth: 1,
-    borderColor: '#007bff',
+    borderColor: '#9a0f21',
   },
   followButtonText: {
     fontSize: 16,
@@ -310,7 +310,7 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
   followingButtonText: {
-    color: '#007bff',
+    color: '#9a0f21',
   },
   descriptionSection: {
     paddingHorizontal: 20,
@@ -339,7 +339,7 @@ const styles = StyleSheet.create({
   },
   seeAllText: {
     fontSize: 14,
-    color: '#007bff',
+    color: '#9a0f21',
     fontWeight: '500',
   },
   eventCard: {

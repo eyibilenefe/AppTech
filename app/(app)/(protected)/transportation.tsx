@@ -309,7 +309,7 @@ const Transportation = () => {
           <Polyline
             key={index}
             coordinates={route}
-            strokeColor="#007AFF"
+            strokeColor="#9a0f21"
             strokeWidth={4}
             lineDashPattern={[5, 5]}
           />
@@ -347,7 +347,7 @@ const Transportation = () => {
           style={[styles.controlButton, { marginBottom: 10 }]}
           onPress={centerOnUserLocation}
         >
-          <Ionicons name="locate" size={20} color="#007AFF" />
+          <Ionicons name="locate" size={20} color="#9a0f21" />
         </Button>
         
         <Button
@@ -356,7 +356,7 @@ const Transportation = () => {
           style={styles.controlButton}
           onPress={toggleBusVisibility}
         >
-          <Ionicons name="bus" size={20} color={showBuses ? "white" : "#007AFF"} />
+          <Ionicons name="bus" size={20} color={showBuses ? "gray" : "#9a0f21"} />
         </Button>
       </View>
 
@@ -403,7 +403,7 @@ const Transportation = () => {
           <View style={styles.routeDisplay}>
             <Text style={styles.routeText}>İYTE → F. Altıyol</Text>
             <Pressable style={styles.directionButton}>
-              <Ionicons name="swap-horizontal" size={20} color="#007AFF" />
+              <Ionicons name="swap-horizontal" size={20} color="#9a0f21" />
             </Pressable>
           </View>
 
@@ -457,7 +457,7 @@ const Transportation = () => {
           {/* Bottom Navigation */}
           <View style={styles.bottomNavigation}>
             <Pressable style={styles.navItem}>
-              <Ionicons name="home" size={24} color="#007AFF" />
+              <Ionicons name="home" size={24} color="#9a0f21" />
             </Pressable>
             <Pressable style={styles.navItem}>
               <Ionicons name="map" size={24} color="#666" />
@@ -531,7 +531,7 @@ const styles = StyleSheet.create({
     width: 12,
     height: 12,
     borderRadius: 6,
-    backgroundColor: '#007AFF', // Solid blue
+    backgroundColor: '#9a0f21', // Solid blue
     borderWidth: 2,
     borderColor: 'white',
   },
@@ -543,7 +543,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 2,
-    borderColor: 'white',
+    borderColor: '#9a0f21',
   },
   routePointText: {
     color: 'white',
@@ -583,13 +583,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderWidth: 1,
-    borderColor: '#007AFF',
+    borderColor: '#9a0f21',
     borderRadius: 8,
     minWidth: 50,
     alignItems: 'center',
   },
   activeRoute: {
-    backgroundColor: '#007AFF',
+    backgroundColor: '#9a0f21',
   },
   routeButtonText: {
     color: 'white',
@@ -597,7 +597,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   routeButtonTextInactive: {
-    color: '#007AFF',
+    color: '#9a0f21',
     fontWeight: 'bold',
     fontSize: 14,
   },

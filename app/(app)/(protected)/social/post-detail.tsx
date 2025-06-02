@@ -659,7 +659,7 @@ const styles = StyleSheet.create({
   },
   replyButtonText: {
     fontSize: 12,
-    color: '#007AFF',
+    color: '#9a0f21',
     fontWeight: '500',
   },
   repliesContainer: {
@@ -673,7 +673,7 @@ const styles = StyleSheet.create({
   },
   showMoreText: {
     fontSize: 13,
-    color: '#007AFF',
+    color: '#9a0f21',
     fontWeight: '500',
   },
   rightActions: {
@@ -681,7 +681,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'flex-end',
-    backgroundColor: '#007AFF',
+    backgroundColor: '#9a0f21',
   },
   leftActions: {
     flex: 1,
@@ -698,7 +698,7 @@ const styles = StyleSheet.create({
     height: '100%',
   },
   replyAction: {
-    backgroundColor: '#007AFF',
+    backgroundColor: '#9a0f21',
   },
   deleteAction: {
     backgroundColor: '#FF3B30',
@@ -720,7 +720,7 @@ const styles = StyleSheet.create({
   },
   loadMoreText: {
     fontSize: 14,
-    color: '#007AFF',
+    color: '#9a0f21',
     fontWeight: '500',
   },
   commentInputBar: {

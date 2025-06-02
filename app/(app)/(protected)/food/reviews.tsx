@@ -241,7 +241,7 @@ const styles = StyleSheet.create({
   overallRatingValue: {
     fontSize: 36,
     fontWeight: 'bold',
-    color: '#007AFF',
+    color: '#9a0f21',
   },
   overallRatingOutOf: {
     fontSize: 18,
@@ -281,7 +281,7 @@ const styles = StyleSheet.create({
   ratingValue: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#007AFF',
+    color: '#9a0f21',
     marginTop: 8,
     textAlign: 'center',
   },
@@ -303,7 +303,7 @@ const styles = StyleSheet.create({
     minHeight: 80,
   },
   submitButton: {
-    backgroundColor: '#007AFF',
+    backgroundColor: '#9a0f21',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',

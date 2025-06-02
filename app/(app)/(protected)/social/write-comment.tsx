@@ -83,7 +83,7 @@ const WriteCommentScreen = () => {
                 <Switch
                   value={isAnonymous}
                   onValueChange={setIsAnonymous}
-                  trackColor={{ false: '#d3d3d3', true: '#007AFF' }}
+                  trackColor={{ false: '#d3d3d3', true: '#9a0f21' }}
                   thumbColor={isAnonymous ? '#ffffff' : '#f4f3f4'}
                 />
               </View>
@@ -207,7 +207,7 @@ const styles = StyleSheet.create({
   },
   replyingToText: {
     fontSize: 14,
-    color: '#007AFF',
+    color: '#9a0f21',
     fontStyle: 'italic',
     flex: 1,
   },

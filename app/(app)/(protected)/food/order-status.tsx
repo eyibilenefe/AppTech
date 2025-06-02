@@ -102,7 +102,7 @@ const OrderStatusScreen = () => {
     if (isCompleted) {
       return <MaterialIcons name="check-circle" size={24} color="#4CAF50" />;
     } else if (isActive) {
-      return <MaterialIcons name="radio-button-checked" size={24} color="#007AFF" />;
+      return <MaterialIcons name="radio-button-checked" size={24} color="#9a0f21" />;
     } else {
       return <MaterialIcons name="radio-button-unchecked" size={24} color="#E0E0E0" />;
     }
@@ -281,7 +281,7 @@ const OrderStatusScreen = () => {
           </Text>
           
           <TouchableOpacity style={styles.supportButton}>
-            <MaterialIcons name="support-agent" size={20} color="#007AFF" />
+            <MaterialIcons name="support-agent" size={20} color="#9a0f21" />
             <Text style={styles.supportButtonText}>Contact Support</Text>
           </TouchableOpacity>
         </View>
@@ -375,7 +375,7 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   statusLineActive: {
-    backgroundColor: '#007AFF',
+    backgroundColor: '#9a0f21',
   },
   statusContent: {
     flex: 1,
@@ -396,7 +396,7 @@ const styles = StyleSheet.create({
   },
   statusTime: {
     fontSize: 12,
-    color: '#007AFF',
+    color: '#9a0f21',
     fontWeight: '600',
   },
   infoCard: {
@@ -462,7 +462,7 @@ const styles = StyleSheet.create({
   orderItemPrice: {
     fontSize: 14,
     fontWeight: 'bold',
-    color: '#007AFF',
+    color: '#9a0f21',
   },
   itemsDivider: {
     height: 1,
@@ -482,7 +482,7 @@ const styles = StyleSheet.create({
   totalValue: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#007AFF',
+    color: '#9a0f21',
   },
   supportCard: {
     backgroundColor: '#fff',
@@ -509,12 +509,12 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 16,
     borderWidth: 1,
-    borderColor: '#007AFF',
+    borderColor: '#9a0f21',
     borderRadius: 8,
     gap: 8,
   },
   supportButtonText: {
-    color: '#007AFF',
+    color: '#9a0f21',
     fontSize: 14,
     fontWeight: '600',
   },

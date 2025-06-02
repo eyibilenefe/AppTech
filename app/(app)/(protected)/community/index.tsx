@@ -3,13 +3,13 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import {
-  FlatList,
-  SafeAreaView,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View
+    FlatList,
+    SafeAreaView,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View
 } from 'react-native';
 
 // Types
@@ -220,7 +220,7 @@ const CommunityEventFeed = () => {
         <Text style={styles.headerTitle}>Community Events</Text>
         <View style={styles.headerActions}>
           <TouchableOpacity style={styles.communitiesButton} onPress={navigateToCommunitiesList}>
-            <MaterialIcons name="people" size={24} color="#007bff" />
+            <MaterialIcons name="people" size={24} color="#9a0f21" />
           </TouchableOpacity>
           <TouchableOpacity style={styles.filterButton} onPress={openFiltersModal}>
             <MaterialIcons name="tune" size={24} color="#333" />
@@ -343,7 +343,7 @@ const styles = StyleSheet.create({
     borderColor: 'transparent',
   },
   selectedCommunityLogoContainer: {
-    borderColor: '#007bff',
+    borderColor: '#9a0f21',
     backgroundColor: '#e3f2fd',
   },
   communityLogo: {
@@ -369,7 +369,7 @@ const styles = StyleSheet.create({
     marginRight: 10,
   },
   selectedFilterTag: {
-    backgroundColor: '#007bff',
+    backgroundColor: '#9a0f21',
   },
   filterTagText: {
     fontSize: 14,
@@ -448,7 +448,7 @@ const styles = StyleSheet.create({
   },
   eventCommunity: {
     fontSize: 12,
-    color: '#007bff',
+    color: '#9a0f21',
     fontWeight: '500',
   },
 });
