@@ -249,6 +249,7 @@ const Transportation = () => {
         showsMyLocationButton={false}
         toolbarEnabled={false}
         mapType="standard"
+        userInterfaceStyle="light"
       >
         {/* User's Current Location Marker */}
         {userCurrentCoords && (
