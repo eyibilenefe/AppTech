@@ -9,62 +9,67 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-			"supportsTablet": true,
-			"config": {
-				"usesNonExemptEncryption": false
-			},
-			"splash": {
-				"image": "./assets/images/splash-icon.png",
-				"resizeMode": "cover",
-				"backgroundColor": "#ffffff",
+      "supportsTablet": true,
+      "config": {
+        "usesNonExemptEncryption": false
+      },
+      "splash": {
+        "image": "./assets/images/splash-icon.png",
+        "resizeMode": "cover",
+        "backgroundColor": "#ffffff",
         "imageWidth": 200,
-				"text": {
-					"text": "AppTech",
-					"color": "#000000",
-					"fontSize": 24,
-					"fontWeight": "bold"
-				},
-				"dark": {
-					"backgroundColor": "#000000",
-					"resizeMode": "cover",
-					"image": "./assets/images/splash-dark.png",
-					"text": {
-						"text": "AppTech",
-						"color": "#000000",
-						"fontSize": 24,
-						"fontWeight": "bold"
-					}
-				}
-			}
-		},
-		"android": {
-			"adaptiveIcon": {
-				"foregroundImage": "./assets/images/adaptive-icon.png"
-			},
-			"splash": {
-				"image": "./assets/images/splash-icon.png",
-				"resizeMode": "cover",
-				"imageWidth": 200,
-				"backgroundColor": "#ffffff",
-				"text": {
-					"text": "AppTech",
-					"color": "#000000",
-					"fontSize": 24,
-					"fontWeight": "bold"
-				},
-				"dark": {
-					"backgroundColor": "#000000",
-					"resizeMode": "cover",
-					"image": "./assets/images/splash-dark.png",
-					"text": {
-						"text": "AppTech",
-						"color": "#000000",
-						"fontSize": 24,
-						"fontWeight": "bold"
-					}
-				}
-			}
-		},
+        "text": {
+          "text": "AppTech",
+          "color": "#000000",
+          "fontSize": 24,
+          "fontWeight": "bold"
+        },
+        "dark": {
+          "backgroundColor": "#000000",
+          "resizeMode": "cover",
+          "image": "./assets/images/splash-dark.png",
+          "text": {
+            "text": "AppTech",
+            "color": "#000000",
+            "fontSize": 24,
+            "fontWeight": "bold"
+          }
+        }
+      },
+      "bundleIdentifier": "com.dogukantopcu.AppTech"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/adaptive-icon.png"
+      },
+      "config": {
+        "googleMaps": {
+        }
+      },
+      "splash": {
+        "image": "./assets/images/splash-icon.png",
+        "resizeMode": "cover",
+        "imageWidth": 200,
+        "backgroundColor": "#ffffff",
+        "text": {
+          "text": "AppTech",
+          "color": "#000000",
+          "fontSize": 24,
+          "fontWeight": "bold"
+        },
+        "dark": {
+          "backgroundColor": "#000000",
+          "resizeMode": "cover",
+          "image": "./assets/images/splash-dark.png",
+          "text": {
+            "text": "AppTech",
+            "color": "#000000",
+            "fontSize": 24,
+            "fontWeight": "bold"
+          }
+        }
+      }
+    },
     "web": {
       "bundler": "metro",
       "output": "static",
