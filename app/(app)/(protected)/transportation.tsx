@@ -1,7 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
 import BottomSheet, { BottomSheetView } from '@gorhom/bottom-sheet';
+import * as LocationExpo from 'expo-location';
 import { StatusBar } from 'expo-status-bar';
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Dimensions, StyleSheet, View } from 'react-native';
 import MapView, { Marker, Polyline } from 'react-native-maps';
 
@@ -38,11 +39,12 @@ const Transportation = () => {
   const mapRef = useRef<MapView>(null);
   
   // Bottom sheet snap points
-  const snapPoints = useMemo(() => ['15%', '50%', '90%'], []);
+  const snapPoints = useMemo(() => ['25%', '50%', '90%'], []);
   
   // State for map editing
   const [editMode, setEditMode] = useState<'none' | 'add_location' | 'add_route'>('none');
   const [showBuses, setShowBuses] = useState(true);
+  const [userCurrentCoords, setUserCurrentCoords] = useState<RoutePoint | null>(null);
   const [locations, setLocations] = useState<Location[]>([
     {
       id: '1',
@@ -105,6 +107,29 @@ const Transportation = () => {
     longitudeDelta: 0.01,
   };
 
+  // Automatically center on user location when the component mounts
+  useEffect(() => {
+    centerOnUserLocation();
+  }, []);
+
+  const requestUserLocation = async (): Promise<RoutePoint | null> => {
+    const { status } = await LocationExpo.requestForegroundPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission Denied', 'Location permission is needed to show your current location.');
+      return null;
+    }
+    try {
+      const location = await LocationExpo.getCurrentPositionAsync({});
+      const coords = { latitude: location.coords.latitude, longitude: location.coords.longitude };
+      setUserCurrentCoords(coords);
+      return coords;
+    } catch (error) {
+      Alert.alert('Location Error', 'Could not fetch current location.');
+      console.error("Error fetching location: ", error);
+      return null;
+    }
+  };
+
   const handleMapPress = (event: any) => {
     const coordinate = event.nativeEvent.coordinate;
     
@@ -149,9 +174,33 @@ const Transportation = () => {
     }
   };
 
-  const centerOnUserLocation = () => {
-    // In a real app, you'd use location services
-    mapRef.current?.animateToRegion(initialRegion, 1000);
+  const centerOnUserLocation = async () => {
+    let locationToCenter = userCurrentCoords;
+    if (!locationToCenter) {
+      locationToCenter = await requestUserLocation();
+    }
+
+    if (locationToCenter && mapRef.current) {
+      mapRef.current.animateToRegion(
+        {
+          ...locationToCenter,
+          latitudeDelta: 0.005, // Zoom in a bit more for user location
+          longitudeDelta: 0.005,
+        },
+        1000
+      );
+    } else if (!locationToCenter) {
+      // If user cancelled or an error occurred, and we don't have a location
+      // Optionally, inform the user or just don't move the map.
+      // For now, let's fall back to the initial region if no location is set.
+      mapRef.current?.animateToRegion(initialRegion, 1000);
+      Alert.alert("Location Unavailable", "Could not center on user location.");
+    }
+    // If locationToCenter is null but userCurrentCoords was already set,
+    // the map would have centered on the previous userCurrentCoords.
+    // If requestUserLocation returned null (e.g. user pressed cancel)
+    // and userCurrentCoords was null, then the map won't move to user,
+    // and we can show an alert or just do nothing further.
   };
 
   const toggleBusVisibility = () => {
@@ -173,6 +222,20 @@ const Transportation = () => {
         toolbarEnabled={false}
         mapType="standard"
       >
+        {/* User's Current Location Marker */}
+        {userCurrentCoords && (
+          <Marker
+            coordinate={userCurrentCoords}
+            title="My Location"
+            pinColor="blue" // Or use a custom marker view
+          >
+            {/* Example of a simple custom marker view for user location */}
+            <View style={styles.userLocationMarker}>
+              <View style={styles.userLocationMarkerInner} />
+            </View>
+          </Marker>
+        )}
+
         {/* Location Markers */}
         {locations.map((location) => (
           <Marker
@@ -271,7 +334,7 @@ const Transportation = () => {
       {/* Bottom Sheet */}
       <BottomSheet
         ref={bottomSheetRef}
-        index={0}
+        index={1}
         snapPoints={snapPoints}
         enablePanDownToClose={false}
         backgroundStyle={styles.bottomSheetBackground}
@@ -448,6 +511,22 @@ const styles = StyleSheet.create({
   },
   busStopMarker: {
     backgroundColor: '#4ECDC4',
+  },
+  userLocationMarker: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: 'rgba(0, 122, 255, 0.2)', // Translucent blue
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  userLocationMarkerInner: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: '#007AFF', // Solid blue
+    borderWidth: 2,
+    borderColor: 'white',
   },
   routePoint: {
     width: 20,
