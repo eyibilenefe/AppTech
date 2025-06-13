@@ -1,15 +1,16 @@
+import { useSupabase } from '@/context/supabase-provider';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import {
-    Alert,
-    SafeAreaView,
-    ScrollView,
-    StyleSheet,
-    Switch,
-    Text,
-    TouchableOpacity,
-    View,
+  Alert,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Switch,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 
 const SettingsScreen = () => {
@@ -40,15 +41,21 @@ const SettingsScreen = () => {
     );
   };
 
+
+  const { signOut } = useSupabase();
+
   const handleLogout = () => {
     Alert.alert(
       'Log Out',
       'Are you sure you want to log out?',
       [
         { text: 'Cancel', style: 'cancel' },
-        { text: 'Log Out', style: 'destructive' },
+        { text: 'Log Out', style: 'destructive', onPress: () => {
+          signOut();
+        } },
       ]
     );
+    
   };
 
   // Mock screen time data
@@ -171,7 +178,9 @@ const SettingsScreen = () => {
 
             <View style={styles.divider} />
 
-            <TouchableOpacity style={styles.actionItem} onPress={handleLogout}>
+            <TouchableOpacity style={styles.actionItem} onPress={() => {
+              handleLogout();
+            }}>
               <MaterialIcons name="exit-to-app" size={24} color="#FF4757" />
               <Text style={[styles.actionLabel, { color: '#FF4757' }]}>Log Out</Text>
               <MaterialIcons name="chevron-right" size={24} color="#ccc" />
@@ -216,13 +225,10 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     backgroundColor: '#9a0f21',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 4,
+    paddingHorizontal: 20,
+    paddingVertical: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
   },
   headerTitle: {
     fontSize: 18,

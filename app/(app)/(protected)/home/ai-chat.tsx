@@ -3,6 +3,8 @@ import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import {
   FlatList,
+  KeyboardAvoidingView,
+  Platform,
   SafeAreaView,
   StyleSheet,
   Text,
@@ -117,6 +119,11 @@ const AIChatScreen = () => {
       />
 
       {/* Input Area */}
+      <KeyboardAvoidingView 
+      style={styles.formContainer}
+                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+            >
       <View style={styles.inputContainer}>
         <TextInput
           style={styles.textInput}
@@ -139,7 +146,7 @@ const AIChatScreen = () => {
           />
         </TouchableOpacity>
       </View>
-
+      </KeyboardAvoidingView>
       {/* Bottom Spacing for Tab Navigation */}
       <View style={styles.bottomSpacing} />
     </SafeAreaView>
@@ -151,6 +158,9 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f5f5f5',
   },
+  formContainer: {
+		bottom: 45,
+	},
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -188,6 +198,7 @@ const styles = StyleSheet.create({
   },
   messagesList: {
     flex: 1,
+    marginBottom: 50,
   },
   messagesContent: {
     padding: 16,
@@ -248,6 +259,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderTopWidth: 1,
     borderTopColor: '#e0e0e0',
+    bottom: 0,
   },
   textInput: {
     flex: 1,

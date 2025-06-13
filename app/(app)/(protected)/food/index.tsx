@@ -2,14 +2,14 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import {
-    Dimensions,
-    FlatList,
-    SafeAreaView,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View
+  Dimensions,
+  FlatList,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View
 } from 'react-native';
 
 interface Restaurant {
@@ -121,9 +121,7 @@ const FoodHomeScreen = () => {
   const [selectedToggle, setSelectedToggle] = useState<'KYK' | 'Cafeteria'>('Cafeteria');
   const [expandedRestaurant, setExpandedRestaurant] = useState<string | null>(null);
   const [expandedCategories, setExpandedCategories] = useState<{[key: string]: boolean}>({});
-  const [selectedDate, setSelectedDate] = useState(0);
 
-  const dates = ['Today', 'Tomorrow', 'Wed', 'Thu', 'Fri'];
 
   const handleRestaurantPress = (restaurantId: string) => {
     setExpandedRestaurant(expandedRestaurant === restaurantId ? null : restaurantId);
@@ -277,7 +275,7 @@ const FoodHomeScreen = () => {
             keyExtractor={(item) => item.id}
             horizontal
             showsHorizontalScrollIndicator={false}
-            snapToInterval={width - 24}
+            snapToInterval={width - 48}
             decelerationRate="fast"
             contentContainerStyle={styles.announcementsList}
           />
@@ -359,16 +357,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: '#fff',
+    paddingHorizontal: 20,
+    paddingVertical: 15,
     borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
+    borderBottomColor: '#f0f0f0',
   },
   headerTitle: {
     fontSize: 20,
