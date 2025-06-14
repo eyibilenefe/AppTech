@@ -10,30 +10,55 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { Meal, fetchKykMeals } from '../../../api/kyk-menu-fetcher';
+import { Meal, fetchKykMeals, fetchReviews } from '../../../api/kyk-menu-fetcher';
 
 const KYKMenu = () => {
   const router = useRouter();
   const [meals, setMeals] = useState<Meal[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [selectedMealType, setSelectedMealType] = useState<'breakfast' | 'dinner'>('breakfast');
+  const [scores, setScores] = useState<{ breakfast: number | null; dinner: number | null }>({
+    breakfast: null,
+    dinner: null,
+  });
 
   useEffect(() => {
-    const getMeals = async () => {
+    const getMealsAndScores = async () => {
       try {
         setLoading(true);
-        const fetchedMeals = await fetchKykMeals();
+        const fetchedMeals = await fetchKykMeals('izmir');
         setMeals(fetchedMeals);
+
+        const today = new Date().toISOString().split('T')[0];
+
+        // Fetch breakfast reviews and calculate score
+        const breakfastReviews = await fetchReviews(today, 'kyk', 'sabah');
+        const breakfastScore =
+          breakfastReviews.length > 0
+            ? breakfastReviews.reduce((sum, review) => sum + review.rating, 0) /
+              breakfastReviews.length
+            : null;
+
+        // Fetch dinner reviews and calculate score
+        const dinnerReviews = await fetchReviews(today, 'kyk', 'akşam');
+        const dinnerScore =
+          dinnerReviews.length > 0
+            ? dinnerReviews.reduce((sum, review) => sum + review.rating, 0) / dinnerReviews.length
+            : null;
+
+        setScores({ breakfast: breakfastScore, dinner: dinnerScore });
+
         setError(null);
       } catch (e) {
-        setError('Failed to fetch menu data.');
+        setError('Failed to fetch menu or score data.');
         console.error(e);
       } finally {
         setLoading(false);
       }
     };
 
-    getMeals();
+    getMealsAndScores();
   }, []);
 
   const handleBackPress = () => {
@@ -41,7 +66,16 @@ const KYKMenu = () => {
   };
 
   const handleReviewsPress = () => {
-    router.push('/(app)/(protected)/food/reviews');
+    const today = new Date().toISOString().split('T')[0]; // Get today's date in YYYY-MM-DD format
+    
+    router.push({
+      pathname: '/(app)/(protected)/food/reviews',
+      params: {
+        date: today,
+        type: 'kyk',
+        daytime: selectedMealType === 'breakfast' ? 'sabah' : 'akşam',
+      },
+    });
   };
 
   const breakfast = meals.find((m) => m.mealType === 'Kahvaltı');
@@ -52,35 +86,88 @@ const KYKMenu = () => {
       return (
         <View style={styles.mealItemsContainer}>
           <Text style={styles.sectionTitle}>{title}</Text>
-          <Text>Veri bulunamadı.</Text>
+          <Text style={styles.noDataText}>Veri bulunamadı.</Text>
         </View>
       );
     }
 
     return (
-      <View>
-        <View style={styles.mealItemsContainer}>
-          <Text style={styles.sectionTitle}>{title}</Text>
-          {meal.items.map((item: string, index: number) => (
-            <View key={index} style={styles.mealItem}>
-              <View style={styles.mealItemContent}>
-                <Text style={styles.mealItemName}>{item}</Text>
-              </View>
-              <View style={styles.mealItemDivider} />
+      <View style={styles.mealItemsContainer}>
+        <Text style={styles.sectionTitle}>{title}</Text>
+        {meal.items.map((item: string, index: number) => (
+          <View key={index} style={styles.mealItem}>
+            <View style={styles.mealItemContent}>
+              <Text style={styles.mealItemName}>{item}</Text>
             </View>
-          ))}
-        </View>
-        {meal.calories && (
-          <View style={styles.calorieSection}>
-            <View style={styles.calorieCard}>
-              <MaterialIcons name="local-fire-department" size={24} color="#FF6B35" />
-              <Text style={styles.calorieText}>Calorie Range</Text>
-              <Text style={styles.calorieValue}>{meal.calories}</Text>
-            </View>
+            <View style={styles.mealItemDivider} />
           </View>
-        )}
+        ))}
       </View>
     );
+  };
+
+  const renderMealToggle = () => {
+    return (
+      <View style={styles.mealToggleContainer}>
+        <TouchableOpacity
+          style={[
+            styles.mealToggleButton,
+            selectedMealType === 'breakfast' && styles.mealToggleButtonActive,
+          ]}
+          onPress={() => setSelectedMealType('breakfast')}
+        >
+          <MaterialIcons 
+            name="free-breakfast" 
+            size={20} 
+            color={selectedMealType === 'breakfast' ? '#fff' : '#9a0f21'} 
+          />
+          <Text
+            style={[
+              styles.mealToggleText,
+              selectedMealType === 'breakfast' && styles.mealToggleTextActive,
+            ]}
+          >
+            Breakfast
+          </Text>
+        </TouchableOpacity>
+        
+        <TouchableOpacity
+          style={[
+            styles.mealToggleButton,
+            selectedMealType === 'dinner' && styles.mealToggleButtonActive,
+          ]}
+          onPress={() => setSelectedMealType('dinner')}
+        >
+          <MaterialIcons 
+            name="restaurant" 
+            size={20} 
+            color={selectedMealType === 'dinner' ? '#fff' : '#9a0f21'} 
+          />
+          <Text
+            style={[
+              styles.mealToggleText,
+              selectedMealType === 'dinner' && styles.mealToggleTextActive,
+            ]}
+          >
+            Dinner
+          </Text>
+        </TouchableOpacity>
+      </View>
+    );
+  };
+
+  const getCurrentMeal = () => {
+    return selectedMealType === 'breakfast' ? breakfast : dinner;
+  };
+
+  const getCurrentMealTitle = () => {
+    return selectedMealType === 'breakfast' ? 'Breakfast (Kahvaltı)' : 'Dinner (Akşam Yemeği)';
+  };
+
+  const getCurrentMealTime = () => {
+    return selectedMealType === 'breakfast' 
+      ? '07:30 - 10:00' 
+      : '16:00 - 22:30';
   };
 
   return (
@@ -98,16 +185,34 @@ const KYKMenu = () => {
         {/* Menu Card */}
         <View style={styles.menuCard}>
           <View style={styles.menuHeader}>
-            <Text style={styles.menuTitle}>Today's Menu</Text>
-            <Text style={styles.menuDate}>
-              {new Date().toLocaleDateString('tr-TR', {
-                weekday: 'long',
-                year: 'numeric',
-                month: 'long',
-                day: 'numeric',
-              })}
-            </Text>
+            <View style={styles.menuHeaderContent}>
+              <View style={styles.menuHeaderLeft}>
+                <Text style={styles.menuTitle}>Today's Menu</Text>
+                <Text style={styles.menuDate}>
+                  {new Date().toLocaleDateString('tr-TR', {
+                    weekday: 'long',
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric',
+                  })}
+                </Text>
+              </View>
+              <View style={styles.overallScoreContainer}>
+                <Text style={styles.overallScoreLabel}>Overall Score</Text>
+                <View style={styles.overallScoreValue}>
+                  <MaterialIcons name="star" size={16} color="#FFD700" />
+                  <Text style={styles.overallScoreText}>
+                    {selectedMealType === 'breakfast'
+                      ? scores.breakfast?.toFixed(1) ?? 'N/A'
+                      : scores.dinner?.toFixed(1) ?? 'N/A'}
+                  </Text>
+                </View>
+              </View>
+            </View>
           </View>
+
+          {/* Meal Type Toggle */}
+          {renderMealToggle()}
 
           {loading ? (
             <ActivityIndicator size="large" color="#9a0f21" />
@@ -115,9 +220,7 @@ const KYKMenu = () => {
             <Text style={styles.errorText}>{error}</Text>
           ) : (
             <>
-              {renderMealSection(breakfast, 'Breakfast (Kahvaltı)')}
-              <View style={{height: 20}}/>
-              {renderMealSection(dinner, 'Dinner (Akşam Yemeği)')}
+              {renderMealSection(getCurrentMeal(), getCurrentMealTitle())}
             </>
           )}
         </View>
@@ -128,7 +231,7 @@ const KYKMenu = () => {
           <View style={styles.infoItem}>
             <MaterialIcons name="access-time" size={20} color="#666" />
             <Text style={styles.infoText}>
-              Serving Time: 07:30 - 10:00 (Breakfast), 16:00 - 22:30 (Dinner)
+              Serving Time: {getCurrentMealTime()}
             </Text>
           </View>
           <View style={styles.infoItem}>
@@ -197,6 +300,14 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#e0e0e0',
   },
+  menuHeaderContent: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+  },
+  menuHeaderLeft: {
+    flex: 1,
+  },
   menuTitle: {
     fontSize: 20,
     fontWeight: 'bold',
@@ -207,6 +318,57 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#666',
   },
+  overallScoreContainer: {
+    alignItems: 'center',
+    gap: 4,
+  },
+  overallScoreLabel: {
+    fontSize: 12,
+    color: '#666',
+    fontWeight: '500',
+  },
+  overallScoreValue: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#f8f9fa',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  overallScoreText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  mealToggleContainer: {
+    flexDirection: 'row',
+    backgroundColor: '#f8f9fa',
+    borderRadius: 8,
+    padding: 4,
+    marginBottom: 20,
+  },
+  mealToggleButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 6,
+    gap: 8,
+  },
+  mealToggleButtonActive: {
+    backgroundColor: '#9a0f21',
+  },
+  mealToggleText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#9a0f21',
+  },
+  mealToggleTextActive: {
+    color: '#fff',
+  },
   mealItemsContainer: {
     marginBottom: 20,
   },
@@ -215,6 +377,12 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#333',
     marginBottom: 12,
+  },
+  noDataText: {
+    fontSize: 14,
+    color: '#666',
+    textAlign: 'center',
+    marginVertical: 20,
   },
   mealItem: {
     marginBottom: 8,
@@ -238,28 +406,6 @@ const styles = StyleSheet.create({
   mealItemDivider: {
     height: 1,
     backgroundColor: '#f0f0f0',
-  },
-  calorieSection: {
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  calorieCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#f8f9fa',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 8,
-    gap: 8,
-  },
-  calorieText: {
-    fontSize: 14,
-    color: '#666',
-  },
-  calorieValue: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#FF6B35',
   },
   infoCard: {
     backgroundColor: '#fff',

@@ -10,6 +10,20 @@ import BusMarker from '@/components/BusMarker';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 
+// --- API and Configuration Constants ---
+const API_BASE_URL = 'https://openapi.izmir.bel.tr/api';
+const BUS_LINES = ['883', '882', '982', '981', '760']; // Example bus lines
+const UPDATE_INTERVAL = 5000; // 5 seconds
+const MAX_RETRIES = 3;
+const RETRY_DELAY = 1000; // 1 second
+
+// --- Utility Functions ---
+const logWithTimestamp = (message: string) => {
+  console.log(`[${new Date().toISOString()}] ${message}`);
+};
+
+const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
 const { width, height } = Dimensions.get('window');
 
 interface Location {
@@ -20,18 +34,28 @@ interface Location {
   type: 'bus_stop' | 'station' | 'landmark';
 }
 
+// New interface for Bus Stops from API
+interface BusStop {
+  id: string;
+  latitude: number;
+  longitude: number;
+  title: string;
+  type: 'bus_stop';
+}
+
 interface RoutePoint {
   latitude: number;
   longitude: number;
 }
 
 interface Bus {
-  id: string;
+  id: string; // Plaka
   latitude: number;
   longitude: number;
   route: string;
   isMoving: boolean;
-  passengers: number;
+  hiz: number;
+  plaka: string;
 }
 
 const Transportation = () => {
@@ -45,6 +69,15 @@ const Transportation = () => {
   const [editMode, setEditMode] = useState<'none' | 'add_location' | 'add_route'>('none');
   const [showBuses, setShowBuses] = useState(true);
   const [userCurrentCoords, setUserCurrentCoords] = useState<RoutePoint | null>(null);
+  
+  // State for API data
+  const [busLocations, setBusLocations] = useState<Bus[]>([]);
+  const [busStops, setBusStops] = useState<BusStop[]>([]);
+  const [activeBusLine, setActiveBusLine] = useState<string>(BUS_LINES[0]);
+
+  // State for map interaction
+  const lastRegion = useRef<any>(null);
+
   const [locations, setLocations] = useState<Location[]>([
     {
       id: '1',
@@ -106,25 +139,6 @@ const Transportation = () => {
     ]
   ]);
   
-  const [buses, setBuses] = useState<Bus[]>([
-    {
-      id: 'bus1',
-      latitude: 38.3243,
-      longitude: 26.630990,
-      route: '883',
-      isMoving: false,
-      passengers: 12
-    },
-    {
-      id: 'bus2',
-      latitude: 38.32463433756970,
-      longitude: 26.635313111491,
-      route: '882',
-      isMoving: true,
-      passengers: 8
-    }
-  ]);
-  
   const [currentRoute, setCurrentRoute] = useState<RoutePoint[]>([]);
 
   // Initial map region
@@ -133,6 +147,125 @@ const Transportation = () => {
     longitude: -122.4324,
     latitudeDelta: 0.01,
     longitudeDelta: 0.01,
+  };
+
+  // --- Lifecycle Hooks for Data Fetching ---
+  useEffect(() => {
+    const fetchInitialData = async () => {
+      logWithTimestamp('Starting initial data fetch for all bus lines.');
+      const allBuses: Bus[] = [];
+      for (const line of BUS_LINES) {
+        const buses = await fetchBusLocations(line);
+        allBuses.push(...buses);
+        await delay(2000); // 2-second delay to avoid rate-limiting
+      }
+      setBusLocations(allBuses);
+      getBusStops(activeBusLine); // Fetch stops for the default active line
+    };
+
+    fetchInitialData();
+    centerOnUserLocation();
+  }, []);
+
+  useEffect(() => {
+    let currentLineIndex = 0;
+    const updateBusLocations = async () => {
+      if (BUS_LINES.length === 0) return;
+      
+      const busLineToUpdate = BUS_LINES[currentLineIndex];
+      logWithTimestamp(`Updating locations for line: ${busLineToUpdate}`);
+      const updatedBuses = await fetchBusLocations(busLineToUpdate);
+      
+      setBusLocations(prevBuses => {
+        const otherBuses = prevBuses.filter(bus => bus.route !== busLineToUpdate);
+        return [...otherBuses, ...updatedBuses];
+      });
+
+      currentLineIndex = (currentLineIndex + 1) % BUS_LINES.length;
+    };
+    
+    const intervalId = setInterval(updateBusLocations, UPDATE_INTERVAL);
+    
+    return () => clearInterval(intervalId);
+  }, []);
+
+  // --- Data Fetching and Memoization ---
+  const filteredBusStops = useMemo(() => {
+    if (!lastRegion.current || lastRegion.current.latitudeDelta > 0.02) {
+      return [];
+    }
+    return busStops.filter(stop => {
+      const { latitude, longitude } = stop;
+      const { latitude: mapLat, longitude: mapLng, latitudeDelta, longitudeDelta } = lastRegion.current;
+      
+      return (
+        latitude > mapLat - latitudeDelta / 2 &&
+        latitude < mapLat + latitudeDelta / 2 &&
+        longitude > mapLng - longitudeDelta / 2 &&
+        longitude < mapLng + longitudeDelta / 2
+      );
+    });
+  }, [busStops, lastRegion.current]);
+
+  // --- Data Fetching Functions ---
+  const fetchBusLocations = async (busLine: string): Promise<Bus[]> => {
+    logWithTimestamp(`Fetching locations for bus line: ${busLine}`);
+    for (let i = 0; i < MAX_RETRIES; i++) {
+      try {
+        const response = await fetch(`${API_BASE_URL}/iztek/hatotobuskonumlari/${busLine}`);
+        if (response.status === 429) {
+          logWithTimestamp(`Rate limit hit for ${busLine}. Retrying after ${RETRY_DELAY}ms...`);
+          await delay(RETRY_DELAY * (i + 1));
+          continue;
+        }
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const data = await response.json();
+        if (!data.HatOtobusKonumlari) {
+          logWithTimestamp(`No bus location data returned for line ${busLine}.`);
+          return [];
+        }
+        return data.HatOtobusKonumlari.map((bus: any) => ({
+          id: bus.Plaka,
+          plaka: bus.Plaka,
+          latitude: parseFloat(bus.Enlem),
+          longitude: parseFloat(bus.Boylam),
+          route: busLine,
+          isMoving: parseInt(bus.Hiz, 10) > 0,
+          hiz: parseInt(bus.Hiz, 10),
+        }));
+      } catch (error) {
+        logWithTimestamp(`Error fetching bus locations for ${busLine} (Attempt ${i + 1}): ${error}`);
+        if (i < MAX_RETRIES - 1) {
+          await delay(RETRY_DELAY);
+        } else {
+          Alert.alert('API Error', `Failed to fetch data for bus line ${busLine} after multiple retries.`);
+          return [];
+        }
+      }
+    }
+    return [];
+  };
+
+  const getBusStops = async (busLine: string) => {
+    logWithTimestamp(`Fetching stops for bus line: ${busLine}`);
+    try {
+      const response = await fetch(`${API_BASE_URL}/iztek/hatduraklari/${busLine}`);
+      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+      const data = await response.json();
+      const stops = data.Duraklar.map((stop: any) => ({
+        id: stop.Sira,
+        title: stop.DurakAdi,
+        latitude: parseFloat(stop.Enlem),
+        longitude: parseFloat(stop.Boylam),
+        type: 'bus_stop'
+      }));
+      setBusStops(stops);
+    } catch (error) {
+      logWithTimestamp(`Error fetching bus stops for ${busLine}: ${error}`);
+      Alert.alert('API Error', `Could not fetch bus stops for line ${busLine}.`);
+    }
   };
 
   // Automatically center on user location when the component mounts
@@ -173,6 +306,38 @@ const Transportation = () => {
       setEditMode('none');
     } else if (editMode === 'add_route') {
       setCurrentRoute([...currentRoute, coordinate]);
+    }
+  };
+
+  // --- Map Interaction Handlers ---
+  const handleSelectBus = (bus: Bus) => {
+    if (mapRef.current) {
+      mapRef.current.animateToRegion({
+        latitude: bus.latitude,
+        longitude: bus.longitude,
+        latitudeDelta: 0.005,
+        longitudeDelta: 0.005,
+      }, 1000);
+    }
+  };
+  
+  const handleBusStopSelect = React.useCallback((stop: BusStop) => {
+    if (mapRef.current) {
+      mapRef.current.animateToRegion({
+        latitude: stop.latitude,
+        longitude: stop.longitude,
+        latitudeDelta: 0.005,
+        longitudeDelta: 0.005,
+      }, 1000);
+    }
+  }, []);
+
+  const handleBusLineChange = (busLine: string) => {
+    setActiveBusLine(busLine);
+    getBusStops(busLine);
+    const firstBusOfLine = busLocations.find(bus => bus.route === busLine);
+    if (firstBusOfLine) {
+      handleSelectBus(firstBusOfLine);
     }
   };
 
@@ -250,6 +415,7 @@ const Transportation = () => {
         toolbarEnabled={false}
         mapType="standard"
         userInterfaceStyle="light"
+        onRegionChangeComplete={(region) => (lastRegion.current = region)}
       >
         {/* User's Current Location Marker */}
         {userCurrentCoords && (
@@ -288,8 +454,29 @@ const Transportation = () => {
           </Marker>
         ))}
 
+        {/* Bus Stop Markers */}
+        {filteredBusStops.map((stop) => (
+          <Marker
+            key={stop.id}
+            coordinate={{
+              latitude: stop.latitude,
+              longitude: stop.longitude,
+            }}
+            title={stop.title}
+            onPress={() => handleBusStopSelect(stop)}
+          >
+            <View style={styles.busStopMarker}>
+              <Ionicons 
+                name={'bus'} 
+                size={20} 
+                color="white" 
+              />
+            </View>
+          </Marker>
+        ))}
+
         {/* Bus Markers */}
-        {showBuses && buses.map((bus) => (
+        {showBuses && busLocations.map((bus) => (
           <Marker
             key={bus.id}
             coordinate={{
@@ -297,8 +484,9 @@ const Transportation = () => {
               longitude: bus.longitude,
             }}
             title={bus.route}
-            description={`Passengers: ${bus.passengers}`}
+            description={`Plate: ${bus.plaka} - Speed: ${bus.hiz} km/h`}
             anchor={{ x: 0.5, y: 0.5 }}
+            onPress={() => handleSelectBus(bus)}
           >
             <BusMarker isMoving={bus.isMoving} />
           </Marker>
@@ -378,21 +566,17 @@ const Transportation = () => {
               style={styles.routeButtons}
               contentContainerStyle={styles.routeButtons}
             >
-              <Pressable style={[styles.routeButton, styles.activeRoute]}>
-                <Text style={styles.routeButtonText}>883</Text>
-              </Pressable>
-              <Pressable style={styles.routeButton}>
-                <Text style={styles.routeButtonTextInactive}>882</Text>
-              </Pressable>
-              <Pressable style={styles.routeButton}>
-                <Text style={styles.routeButtonTextInactive}>982</Text>
-              </Pressable>
-              <Pressable style={styles.routeButton}>
-                <Text style={styles.routeButtonTextInactive}>981</Text>
-              </Pressable>
-              <Pressable style={styles.routeButton}>
-                <Text style={styles.routeButtonTextInactive}>760</Text>
-              </Pressable>
+              {BUS_LINES.map(line => (
+                <Pressable 
+                  key={line}
+                  style={[styles.routeButton, activeBusLine === line && styles.activeRoute]}
+                  onPress={() => handleBusLineChange(line)}
+                >
+                  <Text style={activeBusLine === line ? styles.routeButtonText : styles.routeButtonTextInactive}>
+                    {line}
+                  </Text>
+                </Pressable>
+              ))}
               <Pressable style={styles.routeButton}>
                 <Text style={styles.routeButtonTextInactive}>Ring</Text>
               </Pressable>

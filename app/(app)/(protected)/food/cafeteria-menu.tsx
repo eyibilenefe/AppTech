@@ -278,7 +278,6 @@ const CafeteriaMenu = () => {
         date: selectedDate,
         type: 'yemekhane',
         daytime: 'öğlen',
-        
       },
     });
   };

@@ -278,7 +278,7 @@ const Reviews = () => {
         </View>
         {existingReview && !isEditing ? (
           <TouchableOpacity onPress={handleDeleteConfirmation} disabled={isSubmitting} style={styles.headerButton}>
-            <MaterialIcons name="delete" size={24} color="#fff" />
+            <MaterialIcons name="delete" size={24} color="#9a0f21" />
           </TouchableOpacity>
         ) : (
           <View style={styles.headerButton} />
