@@ -17,8 +17,22 @@ type UniversityUserData = {
 	tel_no: string;
 };
 
+// NEW: Type for user profile from 'users' table
+type UserProfile = {
+	id: string;
+	name: string;
+	st_id: string;
+	dept: string;
+	mail: string;
+	pp: string | null;
+	bio: string | null;
+	tel_no: string | null;
+	is_valid: boolean;
+};
+
 type SupabaseContextProps = {
 	user: User | null;
+	profile: UserProfile | null;
 	session: Session | null;
 	initialized?: boolean;
 	signUp: (email: string, password: string) => Promise<void>;
@@ -34,6 +48,7 @@ type SupabaseProviderProps = {
 
 export const SupabaseContext = createContext<SupabaseContextProps>({
 	user: null,
+	profile: null,
 	session: null,
 	initialized: false,
 	signUp: async () => {},
@@ -51,6 +66,7 @@ export const SupabaseProvider = ({ children }: SupabaseProviderProps) => {
 	const [user, setUser] = useState<User | null>(null);
 	const [session, setSession] = useState<Session | null>(null);
 	const [initialized, setInitialized] = useState<boolean>(false);
+	const [profile, setProfile] = useState<UserProfile | null>(null);
 
 	const signUp = async (email: string, password: string) => {
 		const { error } = await supabase.auth.signUp({
@@ -219,16 +235,48 @@ export const SupabaseProvider = ({ children }: SupabaseProviderProps) => {
 	};
 
 	useEffect(() => {
-		supabase.auth.getSession().then(({ data: { session } }) => {
+		const fetchSessionAndProfile = async () => {
+			const {
+				data: { session },
+			} = await supabase.auth.getSession();
+
 			setSession(session);
-			setUser(session ? session.user : null);
+			setUser(session?.user ?? null);
+
+			if (session?.user) {
+				const { data: profileData } = await supabase
+					.from("users")
+					.select("*")
+					.eq("id", session.user.id)
+					.single();
+				setProfile(profileData as UserProfile | null);
+			}
 			setInitialized(true);
+		};
+
+		fetchSessionAndProfile();
+
+		const {
+			data: { subscription },
+		} = supabase.auth.onAuthStateChange(async (_event, session) => {
+			setSession(session);
+			setUser(session?.user ?? null);
+
+			if (session?.user) {
+				const { data: profileData } = await supabase
+					.from("users")
+					.select("*")
+					.eq("id", session.user.id)
+					.single();
+				setProfile(profileData as UserProfile | null);
+			} else {
+				setProfile(null);
+			}
 		});
 
-		supabase.auth.onAuthStateChange((_event, session) => {
-			setSession(session);
-			setUser(session ? session.user : null);
-		});
+		return () => {
+			subscription.unsubscribe();
+		};
 	}, []);
 
 	useEffect(() => {
@@ -256,6 +304,7 @@ export const SupabaseProvider = ({ children }: SupabaseProviderProps) => {
 		<SupabaseContext.Provider
 			value={{
 				user,
+				profile,
 				session,
 				initialized,
 				signUp,

@@ -1,7 +1,10 @@
-import { MaterialIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
+import { toByteArray } from 'base64-js';
+import * as ImagePicker from 'expo-image-picker';
 import React, { useState } from 'react';
 import {
+  ActivityIndicator,
+  Alert,
   Image,
   SafeAreaView,
   ScrollView,
@@ -13,20 +16,96 @@ import {
   View,
 } from 'react-native';
 
+import { useSupabase } from '@/context/supabase-provider';
+import { supabase } from '@/utils/supabase';
+
 const CreatePostScreen = () => {
   const navigation = useNavigation<any>();
+  const { user, profile } = useSupabase();
+
   const [postText, setPostText] = useState('');
-  const [tagText, setTagText] = useState('');
-  const [isAnonymous, setIsAnonymous] = useState(false);
+  const [isAnonymous, setIsAnonymous] = useState(true);
+  const [image, setImage] = useState<ImagePicker.ImagePickerAsset | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
 
   const handleCancel = () => {
     navigation.goBack();
   };
 
-  const handlePost = () => {
-    // Handle post creation logic here
-    console.log('Creating post:', { postText, tagText, isAnonymous });
-    navigation.goBack();
+  const pickImage = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission required', 'Sorry, we need camera roll permissions to make this work!');
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [4, 3],
+      quality: 0.7,
+      base64: true,
+    });
+
+    if (!result.canceled) {
+      setImage(result.assets[0]);
+    }
+  };
+
+  const handlePost = async () => {
+    if (!postText.trim() || !user) {
+      Alert.alert('Error', 'Post content cannot be empty.');
+      return;
+    }
+
+    setIsUploading(true);
+    let imageUrl: string | null = null;
+
+    try {
+      if (image) {
+        if (image?.base64) {
+          const fileExt = image.uri.split('.').pop() || 'jpg';
+          const fileName = `${profile?.id}-${Date.now()}.${fileExt}`;
+          const filePath = `post-images/${fileName}`;
+          
+          const { error: uploadError } = await supabase.storage
+            .from('posts')
+            .upload(filePath, toByteArray(image.base64), {
+              contentType: `image/${fileExt}`,
+            });
+
+          if (uploadError) {
+            throw uploadError;
+          }
+
+          const { data: urlData } = supabase.storage
+            .from('posts')
+            .getPublicUrl(filePath);
+
+          imageUrl = urlData.publicUrl;
+        }
+      }
+
+      const { error: insertError } = await supabase.from('user_posts').insert({
+        context: postText,
+        image: imageUrl,
+        user_id: isAnonymous ? null : profile?.id,
+        is_anonymous: isAnonymous,
+        post_date: new Date().toISOString(),
+      });
+
+      if (insertError) {
+        throw insertError;
+      }
+
+      Alert.alert('Success', 'Your post has been created!');
+      navigation.goBack();
+    } catch (error: any) {
+      console.error('Error creating post:', error);
+      Alert.alert('Error', error.message || 'Failed to create post. Please try again.');
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   const MediaUploadBox = ({ icon, label }: { icon: string; label: string }) => (
@@ -47,14 +126,18 @@ const CreatePostScreen = () => {
         <TouchableOpacity 
           onPress={handlePost} 
           style={[styles.headerButton, styles.postButton]}
-          disabled={!postText.trim()}
+          disabled={!postText.trim() || isUploading}
         >
-          <Text style={[
-            styles.postText, 
-            !postText.trim() && styles.postTextDisabled
-          ]}>
-            Post
-          </Text>
+          {isUploading ? (
+            <ActivityIndicator size="small" color="white" />
+          ) : (
+            <Text style={[
+              styles.postText, 
+              (!postText.trim() || isUploading) && styles.postTextDisabled
+            ]}>
+              Post
+            </Text>
+          )}
         </TouchableOpacity>
       </View>
 
@@ -62,19 +145,19 @@ const CreatePostScreen = () => {
         {/* User Info Section */}
         <View style={styles.userSection}>
           <Image 
-            source={{ uri: 'https://via.placeholder.com/48' }} 
+            source={{ uri: isAnonymous ? 'https://place-hold.it/300' : profile?.pp || 'https://place-hold.it/300' }} 
             style={styles.userAvatar} 
           />
           <View style={styles.userInfo}>
             <View style={styles.anonymousToggle}>
               <Text style={styles.usernameText}>
-                {isAnonymous ? 'Anonymous' : 'Your Name'}
+                {isAnonymous ? 'Anonymous' : profile?.name || 'User'}
               </Text>
               <View style={styles.toggleContainer}>
                 <Text style={styles.toggleLabel}>Anonymous</Text>
                 <Switch
                   value={isAnonymous}
-                  onValueChange={setIsAnonymous}
+                  onValueChange={() => setIsAnonymous(!isAnonymous)}
                   trackColor={{ false: '#d3d3d3', true: '#9a0f21' }}
                   thumbColor={isAnonymous ? '#ffffff' : '#f4f3f4'}
                 />
@@ -97,55 +180,24 @@ const CreatePostScreen = () => {
           />
         </View>
 
-        {/* Tags Section */}
-        <View style={styles.tagsSection}>
-          <Text style={styles.sectionTitle}>Tags</Text>
-          <TextInput
-            style={styles.tagInput}
-            placeholder="Add tags (e.g., #study #campus #food)"
-            placeholderTextColor="#999"
-            value={tagText}
-            onChangeText={setTagText}
-          />
-        </View>
-
         {/* Media Upload Section */}
         <View style={styles.mediaSection}>
           <Text style={styles.sectionTitle}>Add Media</Text>
           <View style={styles.mediaGrid}>
-            <MediaUploadBox icon="📷" label="Photo" />
-            <MediaUploadBox icon="📷" label="Photo" />
-            <MediaUploadBox icon="📷" label="Photo" />
-          </View>
-          <View style={styles.gifSection}>
-            <TouchableOpacity style={styles.gifButton}>
-              <Text style={styles.gifIcon}>🎬</Text>
-              <Text style={styles.gifLabel}>Add GIF</Text>
+            <TouchableOpacity style={styles.mediaBox} onPress={pickImage}>
+              {image ? (
+                <Image source={{ uri: image.uri }} style={styles.imagePreview} />
+              ) : (
+                <>
+                  <Text style={styles.mediaIcon}>📷</Text>
+                  <Text style={styles.mediaLabel}>Add Photo</Text>
+                </>
+              )}
             </TouchableOpacity>
           </View>
         </View>
       </ScrollView>
 
-      {/* Send Button */}
-      <View style={styles.bottomSection}>
-        <TouchableOpacity 
-          style={[styles.sendButton, !postText.trim() && styles.sendButtonDisabled]}
-          onPress={handlePost}
-          disabled={!postText.trim()}
-        >
-          <MaterialIcons 
-            name="send" 
-            size={24} 
-            color={postText.trim() ? 'white' : '#ccc'} 
-          />
-          <Text style={[
-            styles.sendButtonText, 
-            !postText.trim() && styles.sendButtonTextDisabled
-          ]}>
-            Send Post
-          </Text>
-        </TouchableOpacity>
-      </View>
     </SafeAreaView>
   );
 };
@@ -161,13 +213,14 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 12,
-    backgroundColor: 'white',
     borderBottomWidth: 1,
     borderBottomColor: '#eee',
   },
   headerButton: {
     paddingHorizontal: 4,
     paddingVertical: 8,
+    minWidth: 60,
+    alignItems: 'center',
   },
   headerTitle: {
     fontSize: 18,
@@ -270,30 +323,34 @@ const styles = StyleSheet.create({
   },
   mediaGrid: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 12,
+    gap: 12,
   },
   mediaBox: {
-    width: '31%',
-    aspectRatio: 1,
-    backgroundColor: '#f8f8f8',
+    flex: 1,
+    height: 100,
+    backgroundColor: '#f0f2f5',
     borderRadius: 8,
-    borderWidth: 2,
-    borderColor: '#ddd',
-    borderStyle: 'dashed',
     justifyContent: 'center',
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#e3e3e3',
+    borderStyle: 'dashed',
   },
   mediaIcon: {
     fontSize: 24,
-    marginBottom: 4,
   },
   mediaLabel: {
-    fontSize: 12,
+    fontSize: 14,
     color: '#666',
+    marginTop: 4,
+  },
+  imagePreview: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 8,
   },
   gifSection: {
-    alignItems: 'center',
+    marginTop: 12,
   },
   gifButton: {
     flexDirection: 'row',
@@ -321,19 +378,20 @@ const styles = StyleSheet.create({
     borderTopColor: '#eee',
   },
   sendButton: {
+    flex: 1,
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'center',
+    alignItems: 'center',
     backgroundColor: '#9a0f21',
-    paddingVertical: 12,
+    paddingVertical: 14,
     borderRadius: 24,
   },
   sendButtonDisabled: {
-    backgroundColor: '#f0f0f0',
+    backgroundColor: '#e0e0e0',
   },
   sendButtonText: {
-    fontSize: 16,
     color: 'white',
+    fontSize: 16,
     fontWeight: '600',
     marginLeft: 8,
   },

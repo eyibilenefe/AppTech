@@ -3,6 +3,7 @@ import React from 'react';
 import CreatePostScreen from './social/create-post';
 import SocialFeedScreen from './social/feed';
 import PostDetailScreen from './social/post-detail';
+import ProfileReviewScreen from './social/profile-review';
 import WriteCommentScreen from './social/write-comment';
 
 const Stack = createStackNavigator();
@@ -18,6 +19,7 @@ const Social = () => {
       <Stack.Screen name="PostDetail" component={PostDetailScreen} />
       <Stack.Screen name="CreatePost" component={CreatePostScreen} />
       <Stack.Screen name="WriteComment" component={WriteCommentScreen} />
+      <Stack.Screen name="ProfileReview" component={ProfileReviewScreen} />
     </Stack.Navigator>
   );
 };
