@@ -36,7 +36,7 @@ const formSchema = z.object({
 });
 
 export default function SignIn() {
-	const { signInWithUniversityApi, signInWithPassword } = useSupabase();
+	const { signInWithUniversityApi } = useSupabase();
 	const [passwordVisible, setPasswordVisible] = useState(false);
 	const [rememberMe, setRememberMe] = useState(false);
 

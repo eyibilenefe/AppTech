@@ -13,7 +13,7 @@ type UniversityUserData = {
 	name: string;
 	studentId: string;
 	department: string;
-	mail: string;
+	email: string;
 	tel_no: string;
 };
 
@@ -23,7 +23,7 @@ type UserProfile = {
 	name: string;
 	st_id: string;
 	dept: string;
-	mail: string;
+	email: string;
 	pp: string | null;
 	bio: string | null;
 	tel_no: string | null;
@@ -124,20 +124,20 @@ export const SupabaseProvider = ({ children }: SupabaseProviderProps) => {
 
 			const data = await apiResponse.json();
 			const universityUserData : UniversityUserData = data.user;
+			console.log("universityUserData HEEEY:", universityUserData);
 
 			// 2. Sign in or sign up user in Supabase
 			let authUser: User | null = null;
 			let sessionObj: Session | null = null;
 
 			const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
-				email: universityUserData.mail,
+				email: universityUserData.email,
 				password: process.env.EXPO_PUBLIC_SUPABASE_PASSWORD || "",
 			});
-			console.log("signInData HEEEY");
 
 			if (signInError) {
 				const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
-					email: universityUserData.mail,
+					email: universityUserData.email,
 					password: process.env.EXPO_PUBLIC_SUPABASE_PASSWORD || "",
 				});
 
@@ -186,7 +186,7 @@ export const SupabaseProvider = ({ children }: SupabaseProviderProps) => {
 			const { data: existingProfile, error: fetchError } = await supabase
 				.from("users")
 				.select("id")
-				.eq("mail", universityUserData.mail)
+				.eq("mail", universityUserData.email)
 				.single();
 
 			if (fetchError && fetchError.code !== "PGRST116") { // PGRST116: "Query returned no rows" (expected if new user)
@@ -198,7 +198,7 @@ export const SupabaseProvider = ({ children }: SupabaseProviderProps) => {
 				name: universityUserData.name,
 				st_id: universityUserData.studentId,
 				dept: universityUserData.department,
-				mail: universityUserData.mail, // Ensure this matches authUser.email
+				mail: universityUserData.email, // Ensure this matches authUser.email
 				tel_no: universityUserData.tel_no,
 			};
 
