@@ -1,4 +1,5 @@
 import { Image } from '@/components/image';
+import { useSupabase } from '@/context/supabase-provider';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React from 'react';
@@ -14,13 +15,7 @@ import {
 const HomeScreen = () => {
   const router = useRouter();
 
-  const userData = {
-    fullName: 'Ahmet Yılmaz',
-    studentNumber: '280201001',
-    department: 'Computer Engineering',
-    balance: '124.50 ₺',
-    grade: '3rd Year',
-  };
+  const userData = useSupabase().profile;
 
   const handleNavigation = (screen: string) => {
     router.push(`./home/${screen}` as any);
@@ -72,15 +67,14 @@ const HomeScreen = () => {
             </View>
             <View style={styles.balanceContainer}>
               <Text style={styles.balanceLabel}>Balance</Text>
-              <Text style={styles.balanceAmount}>{userData.balance}</Text>
+              {/* <Text style={styles.balanceAmount}>{userData?.balance}</Text> */}
             </View>
           </View>
 
           <View style={styles.cardBody}>
-            <Text style={styles.userName}>{userData.fullName}</Text>
-            <Text style={styles.studentNumber}>Student No: {userData.studentNumber}</Text>
-            <Text style={styles.department}>{userData.department}</Text>
-            <Text style={styles.grade}>{userData.grade}</Text>
+            <Text style={styles.userName}>{userData?.name}</Text>
+            <Text style={styles.studentNumber}>Student No: {userData?.st_id}</Text>
+            <Text style={styles.department}>{userData?.dept}</Text>
           </View>
 
           <View style={styles.cardFooter}>

@@ -1,7 +1,8 @@
 import { MaterialIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
+  ActivityIndicator,
   SafeAreaView,
   ScrollView,
   StyleSheet,
@@ -9,29 +10,31 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-
-interface MealItem {
-  id: string;
-  name: string;
-  calories: number;
-}
-
-const dummyMealItems: MealItem[] = [
-  { id: '1', name: 'Yumurta (Scrambled Eggs)', calories: 150 },
-  { id: '2', name: 'Beyaz Peynir (White Cheese)', calories: 100 },
-  { id: '3', name: 'Zeytin (Olives)', calories: 80 },
-  { id: '4', name: 'Domates (Tomatoes)', calories: 20 },
-  { id: '5', name: 'Salatalık (Cucumber)', calories: 15 },
-  { id: '6', name: 'Ekmek (Bread)', calories: 120 },
-  { id: '7', name: 'Çay (Tea)', calories: 5 },
-  { id: '8', name: 'Reçel (Jam)', calories: 60 },
-  { id: '9', name: 'Tereyağ (Butter)', calories: 100 },
-  { id: '10', name: 'Bal (Honey)', calories: 50 },
-];
+import { Meal, fetchKykMeals } from '../../../api/kyk-menu-fetcher';
 
 const KYKMenu = () => {
   const router = useRouter();
-  const totalCalories = dummyMealItems.reduce((sum, item) => sum + item.calories, 0);
+  const [meals, setMeals] = useState<Meal[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const getMeals = async () => {
+      try {
+        setLoading(true);
+        const fetchedMeals = await fetchKykMeals();
+        setMeals(fetchedMeals);
+        setError(null);
+      } catch (e) {
+        setError('Failed to fetch menu data.');
+        console.error(e);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    getMeals();
+  }, []);
 
   const handleBackPress = () => {
     router.back();
@@ -39,6 +42,45 @@ const KYKMenu = () => {
 
   const handleReviewsPress = () => {
     router.push('/(app)/(protected)/food/reviews');
+  };
+
+  const breakfast = meals.find((m) => m.mealType === 'Kahvaltı');
+  const dinner = meals.find((m) => m.mealType === 'Akşam Yemeği');
+
+  const renderMealSection = (meal: Meal | undefined, title: string) => {
+    if (!meal || meal.items.length === 0) {
+      return (
+        <View style={styles.mealItemsContainer}>
+          <Text style={styles.sectionTitle}>{title}</Text>
+          <Text>Veri bulunamadı.</Text>
+        </View>
+      );
+    }
+
+    return (
+      <View>
+        <View style={styles.mealItemsContainer}>
+          <Text style={styles.sectionTitle}>{title}</Text>
+          {meal.items.map((item: string, index: number) => (
+            <View key={index} style={styles.mealItem}>
+              <View style={styles.mealItemContent}>
+                <Text style={styles.mealItemName}>{item}</Text>
+              </View>
+              <View style={styles.mealItemDivider} />
+            </View>
+          ))}
+        </View>
+        {meal.calories && (
+          <View style={styles.calorieSection}>
+            <View style={styles.calorieCard}>
+              <MaterialIcons name="local-fire-department" size={24} color="#FF6B35" />
+              <Text style={styles.calorieText}>Calorie Range</Text>
+              <Text style={styles.calorieValue}>{meal.calories}</Text>
+            </View>
+          </View>
+        )}
+      </View>
+    );
   };
 
   return (
@@ -67,28 +109,17 @@ const KYKMenu = () => {
             </Text>
           </View>
 
-          {/* Meal Items */}
-          <View style={styles.mealItemsContainer}>
-            <Text style={styles.sectionTitle}>Breakfast Items</Text>
-            {dummyMealItems.map((item) => (
-              <View key={item.id} style={styles.mealItem}>
-                <View style={styles.mealItemContent}>
-                  <Text style={styles.mealItemName}>{item.name}</Text>
-                  <Text style={styles.mealItemCalories}>{item.calories} cal</Text>
-                </View>
-                <View style={styles.mealItemDivider} />
-              </View>
-            ))}
-          </View>
-
-          {/* Total Calories */}
-          <View style={styles.calorieSection}>
-            <View style={styles.calorieCard}>
-              <MaterialIcons name="local-fire-department" size={24} color="#FF6B35" />
-              <Text style={styles.calorieText}>Total Calories</Text>
-              <Text style={styles.calorieValue}>{totalCalories} cal</Text>
-            </View>
-          </View>
+          {loading ? (
+            <ActivityIndicator size="large" color="#9a0f21" />
+          ) : error ? (
+            <Text style={styles.errorText}>{error}</Text>
+          ) : (
+            <>
+              {renderMealSection(breakfast, 'Breakfast (Kahvaltı)')}
+              <View style={{height: 20}}/>
+              {renderMealSection(dinner, 'Dinner (Akşam Yemeği)')}
+            </>
+          )}
         </View>
 
         {/* Additional Info */}
@@ -96,7 +127,9 @@ const KYKMenu = () => {
           <Text style={styles.infoTitle}>Meal Information</Text>
           <View style={styles.infoItem}>
             <MaterialIcons name="access-time" size={20} color="#666" />
-            <Text style={styles.infoText}>Serving Time: 07:30 - 10:00</Text>
+            <Text style={styles.infoText}>
+              Serving Time: 07:30 - 10:00 (Breakfast), 16:00 - 22:30 (Dinner)
+            </Text>
           </View>
           <View style={styles.infoItem}>
             <MaterialIcons name="location-on" size={20} color="#666" />
@@ -208,6 +241,7 @@ const styles = StyleSheet.create({
   },
   calorieSection: {
     alignItems: 'center',
+    marginBottom: 20,
   },
   calorieCard: {
     flexDirection: 'row',
@@ -266,6 +300,11 @@ const styles = StyleSheet.create({
   },
   bottomSpacing: {
     height: 100,
+  },
+  errorText: {
+    color: 'red',
+    textAlign: 'center',
+    marginVertical: 20,
   },
 });
 

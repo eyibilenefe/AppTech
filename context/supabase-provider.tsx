@@ -11,7 +11,7 @@ SplashScreen.preventAutoHideAsync();
 type UniversityUserData = {
 	id: string; // UUID
 	name: string;
-	studentId: string;
+	student_id_no: string;
 	department: string;
 	email: string;
 	tel_no: string;
@@ -124,7 +124,6 @@ export const SupabaseProvider = ({ children }: SupabaseProviderProps) => {
 
 			const data = await apiResponse.json();
 			const universityUserData : UniversityUserData = data.user;
-			console.log("universityUserData HEEEY:", universityUserData);
 
 			// 2. Sign in or sign up user in Supabase
 			let authUser: User | null = null;
@@ -135,6 +134,7 @@ export const SupabaseProvider = ({ children }: SupabaseProviderProps) => {
 				password: process.env.EXPO_PUBLIC_SUPABASE_PASSWORD || "",
 			});
 
+
 			if (signInError) {
 				const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
 					email: universityUserData.email,
@@ -142,84 +142,81 @@ export const SupabaseProvider = ({ children }: SupabaseProviderProps) => {
 				});
 
 				if (signUpError) {
-					console.log("inside signUpError");
-					// If sign up also fails (e.g., user already exists but signInWithPassword failed - implies password mismatch for existing Supabase account)
 					throw signUpError;
 				}
-				if (signUpData.user) {
-					authUser = signUpData.user;
-					sessionObj = signUpData.session; // Session might be null if email confirmation is required and not auto-confirmed
-				} else {
+
+				if (!signUpData.user) {
 					throw new Error("Supabase signUp did not return a user.");
 				}
-				// Check if session is established, especially if email confirmation is needed.
-				// For this flow to be seamless client-side, auto-confirm or no email verification is preferred.
-				if (!sessionObj && authUser) {
+
+				// After a successful sign-up, a session might not be immediately available
+				// (e.g., if email confirmation is on). We'll explicitly sign in to get a session.
+				const { data: signInAfterSignUpData, error: signInAfterSignUpError } =
+					await supabase.auth.signInWithPassword({
+						email: universityUserData.email,
+						password: process.env.EXPO_PUBLIC_SUPABASE_PASSWORD || "",
+					});
+
+				if (signInAfterSignUpError) {
+					// This might happen if email confirmation is required and not yet done.
+					// The initial sign-up would have worked, but sign-in fails.
 					Alert.alert(
 						"Account Created",
-						"Please check your email to confirm your account if required, then try signing in again."
+						"Please check your email to confirm your account, then try signing in again."
 					);
-					// Stop further execution as profile creation depends on an active session for RLS.
-					// The onAuthStateChange listener will eventually pick up the state.
-					// For now, we'll return, and user will need to re-login after confirmation.
-					// Alternatively, if you are certain about auto-confirmation, you can proceed.
-					return; 
+					// We return here because we can't proceed without a session.
+					// The user needs to take action.
+					return;
 				}
 
+				if (signInAfterSignUpData.user && signInAfterSignUpData.session) {
+					authUser = signInAfterSignUpData.user;
+					sessionObj = signInAfterSignUpData.session;
+				} else {
+					throw new Error("Failed to sign in after user creation.");
+				}
 			} else if (signInData.user) {
 				authUser = signInData.user;
 				sessionObj = signInData.session;
 			}
 
-			
 			if (!authUser || !sessionObj) {
-				throw new Error("Failed to establish a Supabase session. Ensure email confirmation (if enabled) is completed.");
+				throw new Error("Failed to establish a Supabase session.");
 			}
 			
 			// Manually update state if onAuthStateChange hasn't fired yet or to ensure UI updates
 			// This is often handled by onAuthStateChange but can be explicit here too.
-			setSession(sessionObj);
 			setUser(authUser);
+			setSession(sessionObj);
 
-
-			// 3. Upsert user profile in 'profiles' table
-			const { data: existingProfile, error: fetchError } = await supabase
-				.from("users")
-				.select("id")
-				.eq("mail", universityUserData.email)
-				.single();
-
-			if (fetchError && fetchError.code !== "PGRST116") { // PGRST116: "Query returned no rows" (expected if new user)
-				throw fetchError;
-			}
-
+			// 3. Upsert user profile in 'users' table
 			const profileData = {
 				id: authUser.id, // Link to Supabase auth user
 				name: universityUserData.name,
-				st_id: universityUserData.studentId,
+				st_id: universityUserData.student_id_no,
 				dept: universityUserData.department,
-				mail: universityUserData.email, // Ensure this matches authUser.email
+				mail: universityUserData.email,
 				tel_no: universityUserData.tel_no,
 			};
 
-			if (existingProfile) {
-				// Profile exists, update it
-				const { error: updateError } = await supabase
-					.from("users")
-					.update(profileData)
-					.eq("id", existingProfile.id); // Assuming universityUserData.id is PK of profile
-				if (updateError) throw updateError;
-			} else {
-				// Profile doesn't exist, insert it
-				// The PK 'id' for profiles table comes from the university API
-				const { error: insertError } = await supabase
-					.from("users")
-					.insert({ ...profileData, id: universityUserData.id }); 
-				if (insertError) throw insertError;
+			// Use upsert to either insert a new profile or update an existing one
+			// based on the 'mail' column, which should have a UNIQUE constraint.
+			const { data: upsertedProfile, error: upsertError } = await supabase
+				.from("users")
+				.upsert(profileData, { onConflict: "mail" })
+				.select()
+				.single();
+
+			if (upsertError) {
+				throw upsertError;
 			}
+
+			if (upsertedProfile) {
+				setProfile(upsertedProfile as UserProfile);
+			}
+
 			// The onAuthStateChange listener in useEffect should also update user/session state
 			// and trigger navigation if needed.
-
 		} catch (error: any) {
 			console.error("Error in signInWithUniversityApi:", error);
 			Alert.alert("Authentication Error", error.message || "An unexpected error occurred.");
