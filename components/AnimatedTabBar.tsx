@@ -5,11 +5,11 @@ import { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import * as Haptics from 'expo-haptics';
 import React from 'react';
 import {
-  Animated,
-  Dimensions,
-  Platform,
-  TouchableOpacity,
-  View,
+    Animated,
+    Dimensions,
+    Platform,
+    TouchableOpacity,
+    View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -58,7 +58,7 @@ const TabItem: React.FC<TabItemProps> = ({
 
   const getTabIcon = (routeName: string, color: string, size: number) => {
     switch (routeName) {
-      case 'index':
+      case 'home':
         return <MaterialIcons name="credit-card" size={size} color={color} />;
       case 'explore':
         return <MaterialIcons name="explore" size={size} color={color} />;
@@ -228,7 +228,7 @@ export const AnimatedTabBar: React.FC<BottomTabBarProps> = ({
       >
         {state.routes
           .filter((route: any) => [
-            'index',
+            'home',
             'transportation',
             'food',
             'community',

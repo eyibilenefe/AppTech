@@ -1,0 +1,22 @@
+{
+  "fields": [{"type":"int","id":"_id"},{"info":{"notes":"Hat numarası bilgisi","type_override":"","label":""},"type":"numeric","id":"HAT_NO"},{"info":{"notes":"Hat adı bilgisi","type_override":"","label":""},"type":"text","id":"HAT_ADI"},{"info":{"notes":"Güzergah ile ilgili ek açıklama bilgisi","type_override":"","label":""},"type":"text","id":"GUZERGAH_ACIKLAMA"},{"info":{"notes":"Hat ile ilgili var ise açıklama bilgisi","type_override":"","label":""},"type":"text","id":"ACIKLAMA"},{"info":{"notes":"Hat başlangıç bilgisi","type_override":"","label":""},"type":"text","id":"HAT_BASLANGIC"},{"info":{"notes":"Hat bitiş bilgisi","type_override":"","label":""},"type":"text","id":"HAT_BITIS"}],
+  "records": [
+    [292,732,"SEFERİHİSAR - URLA","ULAMIŞ-TURGUT-İHSANİYE - BADEMLER","","SEFERİHİSAR","URLA"],
+    [293,733,"YAĞCILAR - URLA","DEMİRCİLİ-KUŞÇULAR-CAMİ ATİK MAH.","","YAĞCILAR","URLA"],
+    [294,734,"ÖZBEK - URLA","ÖZBEK YOLU-AHMET BESİM UYSAL CAD.-ERDOĞAN KER CAD.","","ÖZBEK","URLA"],
+    [295,737,"KADIOVACIK - URLA","BARBAROS-BİRGİ-UZUNKUYU","","KADIOVACIK","URLA"],
+    [296,738,"ÇEŞMEALTI - URLA","YALI CAD.-MİTHATPAŞA CAD.-BİNEVLER","","ÇEŞMEALTI","URLA"],
+    [316,760,"ÇEŞME-URLA","ILICA-UZUNKUYU-İÇMELER","","ÇEŞME","URLA"],
+    [317,761,"KARABURUN-URLA","MORDOĞAN-GÜLBAHÇE","20.01.2022 tarih ve 2022/50 sayılı Ukome Kararınca Mordoğan, Atatürk Caddesinin Cumhuriyet Meydanı ile 124 Sokak arasında kalan kısmı gün içerisinde trafiğe kapatılacak olup kapalı olduğu sürece \"Mordoğan İskele\" durağımızdan hizmet verilemeyecektir. ","KARABURUN","URLA"],
+    [318,762,"GÜZELBAHÇE - URLA","YELKİ - DADAŞKENT","","GÜZELBAHÇE","URLA"],
+    [400,882,"İYTE - URLA","","","İ.Y.T.E","URLA"],
+    [401,883,"İYTE - F.ALTAY AKT. MER. EKSPRES","EKSPRES HAT","","İYTE","F.ALTAY AKT."],
+    [405,906,"ÇEŞME - URLA","GERMİYAN - REİSDERE","","ÇEŞME","URLA"],
+    [406,909,"ZEYTİNALANI - F. ALTAY AKTARMA MERKEZİ","NARLIDERE-9 EYLÜL HASTANESİ","","ZEYTİNALANI","F. ALTAY AKTARMA MERKEZİ"],
+    [418,961,"İÇMELER - URLA","Urla Devlet Hast. - Torosan","EĞİTİM ÖĞRETİMİN UYGULANDIĞI HAFTA İÇİ GÜNLERİ İÇMELER'DEN 15.45 SERVİSİ YILDIZ DURAĞI'NDAN BAŞLAR.","İÇMELER","URLA"],
+    [419,962,"URLA - YELKİ","İZMİR-ÇEŞME YOLU- M.FEVZİ ÇAKMAK CAD.-SEFERİHİSAR CAD","Hafta içi günleri Siteler'den Urla Yönüne 08:20 servisi ve  Urla'dan 16:00 , 17:00 servisleri Hakan Çeken Anadolu Lisesi'nden başlar. ","URLA","YELKİ"],
+    [428,978,"PARLAK-URLA","KÜÇÜKBAHÇE-GÜLBAHÇE-BALIKLIOVA","","PARLAK","URLA"],
+    [430,981,"BALIKLIOVA - F.ALTAY AKTARMA MERKEZİ","KARAPINAR-NARLIDERE-9 EYLÜL HASTANESİ","","BALIKLIOVA","F.ALTAY AKT."],
+    [431,982,"İYTE - F.ALTAY AKTARMA MERKEZİ","İÇMELER-NARLIDERE","","İ.Y.T.E.","F.ALTAY AKT."],
+    [433,984,"URLA - F.ALTAY AKTARMA MERKEZİ","URLA DEVLET HASTANESİ-URLA İSKELE-KALABAK-ZEYTINALANI","","URLA","F.ALTAY AKT."]
+]}
