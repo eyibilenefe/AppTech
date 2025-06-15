@@ -1,7 +1,8 @@
 import { MaterialIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
+  ActivityIndicator,
   FlatList,
   KeyboardAvoidingView,
   Platform,
@@ -10,84 +11,191 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  View,
+  View
 } from 'react-native';
+
+import { supabase } from '../../../../utils/supabase';
+import {
+  AIMessage,
+  ChatMessage,
+  getChatHistory,
+  sendMessageToGeminiWithDB
+} from '../../../api/gemini-chat';
 
 interface Message {
   id: string;
   text: string;
   isUser: boolean;
   timestamp: Date;
+  isLoading?: boolean;
 }
 
 const AIChatScreen = () => {
   const router = useRouter();
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: '1',
-      text: 'Hello! I\'m IYTE-bot, your campus assistant. How can I help you today?',
-      isUser: false,
-      timestamp: new Date(),
-    },
-  ]);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);  const [userId, setUserId] = useState<string | undefined>(undefined);
+  const flatListRef = useRef<FlatList>(null);
+
+  // Kullanıcı authentication state'ini kontrol et
+  useEffect(() => {
+    const getUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        setUserId(user.id);
+      }
+    };
+    getUser();
+  }, []);
+
+  // Chat geçmişini database'den yükle
+  const loadChatHistory = async () => {
+    try {
+      const result = await getChatHistory(userId, 50);
+      if (result.success && result.messages) {        const dbMessages: Message[] = result.messages.map((msg: AIMessage, index: number) => ({
+          id: msg.id || index.toString(),
+          text: msg.message || '',
+          isUser: msg.type === 'human',
+          timestamp: msg.message_date ? new Date(msg.message_date) : new Date(),
+        }));
+        
+        // Eğer mesaj yoksa hoş geldin mesajı ekle
+        if (dbMessages.length === 0) {
+          setMessages([{
+            id: '1',
+            text: 'Merhaba! Ben İYTE Rektörü Yusuf Baran. Size nasıl yardımcı olabilirim?',
+            isUser: false,
+            timestamp: new Date(),
+          }]);
+        } else {
+          setMessages(dbMessages);
+        }
+        
+        // Chat history için Gemini format'ına çevir
+        const geminiHistory: ChatMessage[] = result.messages.map((msg: AIMessage) => ({
+          role: msg.type === 'human' ? 'user' : 'model',
+          parts: msg.message,
+        }));
+        setChatHistory(geminiHistory);
+      }
+    } catch (error) {
+      console.error('Chat history load error:', error);
+      // Hata durumunda default mesajı göster
+      setMessages([{
+        id: '1',
+        text: 'Merhaba! Ben İYTE Rektörü Yusuf Baran. Size nasıl yardımcı olabilirim?',
+        isUser: false,
+        timestamp: new Date(),
+      }]);
+    }
+  };
+
+  // Component mount edildiğinde chat geçmişini yükle
+  useEffect(() => {
+    loadChatHistory();
+  }, [userId]);
 
   const handleBackPress = () => {
     router.back();
   };
-
-  const handleSendMessage = () => {
-    if (inputText.trim() === '') return;
+  const handleSendMessage = async () => {
+    if (inputText.trim() === '' || isLoading) return;
 
     const userMessage: Message = {
       id: Date.now().toString(),
-      text: inputText,
+      text: inputText.trim(),
       isUser: true,
       timestamp: new Date(),
     };
 
+    const currentInput = inputText.trim();
     setMessages(prev => [...prev, userMessage]);
     setInputText('');
+    setIsLoading(true);    // Add loading message
+    const loadingMessage: Message = {
+      id: (Date.now() + 1).toString(),
+      text: 'Yazıyor...',
+      isUser: false,
+      timestamp: new Date(),
+      isLoading: true,
+    };
+    setMessages(prev => [...prev, loadingMessage]);
 
-    // Simulate bot response
+    // Scroll to bottom
     setTimeout(() => {
+      flatListRef.current?.scrollToEnd({ animated: true });
+    }, 100);
+
+    try {      // Gemini API'ye mesaj gönder ve database'e kaydet
+      const response = await sendMessageToGeminiWithDB(currentInput, userId, chatHistory);
+      
+      // Loading mesajını kaldır
+      setMessages(prev => prev.filter(msg => !msg.isLoading));
+      
+      let botResponseText: string;
+      
+      if (response.success) {
+        botResponseText = response.message;
+        
+        // Chat geçmişini güncelle
+        setChatHistory(prev => [
+          ...prev,
+          { role: 'user', parts: currentInput },
+          { role: 'model', parts: response.message },
+        ]);      } else {
+        // API hatası durumunda genel hata mesajı
+        botResponseText = 'Üzgünüm, şu anda teknik bir sorun yaşıyorum. Lütfen daha sonra tekrar deneyin.';
+        console.warn('Gemini API Error:', response.error);
+      }
+
       const botResponse: Message = {
-        id: (Date.now() + 1).toString(),
-        text: getBotResponse(inputText),
+        id: (Date.now() + 2).toString(),
+        text: botResponseText,
         isUser: false,
         timestamp: new Date(),
       };
-      setMessages(prev => [...prev, botResponse]);
-    }, 1000);
-  };
 
-  const getBotResponse = (userInput: string): string => {
-    const input = userInput.toLowerCase();
-    
-    if (input.includes('cafeteria') || input.includes('food') || input.includes('meal')) {
-      return 'The cafeteria is open from 11:30 AM to 9:00 PM. Today\'s menu includes grilled chicken, vegetarian pasta, and fresh salads. You can make reservations through the app!';
-    } else if (input.includes('gym') || input.includes('sport') || input.includes('fitness')) {
-      return 'The sports center is open from 8:00 AM to 10:00 PM. Available facilities include gym, tennis courts, basketball courts, and swimming pool. Would you like to make a reservation?';
-    } else if (input.includes('library') || input.includes('study')) {
-      return 'The library is open 24/7 for students. You can reserve study rooms through the campus portal. Current capacity is at 65%.';
-    } else if (input.includes('balance') || input.includes('money') || input.includes('payment')) {
-      return 'Your current balance is 124.50 ₺. You can top up your balance using the "Bakiye Yükle" feature in the app or at campus kiosks.';
-    } else if (input.includes('help') || input.includes('?')) {
-      return 'I can help you with:\n• Cafeteria information and reservations\n• Sports facility bookings\n• Library services\n• Campus balance and payments\n• General campus information\n\nWhat would you like to know?';
-    } else {
-      return 'I understand you\'re asking about campus services. Could you be more specific? I can help with cafeteria, sports facilities, library, balance inquiries, and general campus information.';
+      setMessages(prev => [...prev, botResponse]);
+      
+    } catch (error) {
+      // Loading mesajını kaldır
+      setMessages(prev => prev.filter(msg => !msg.isLoading));
+        // Hata durumunda genel hata mesajı
+      const fallbackResponse: Message = {
+        id: (Date.now() + 2).toString(),
+        text: 'Üzgünüm, şu anda teknik bir sorun yaşıyorum. Lütfen daha sonra tekrar deneyin.',
+        isUser: false,
+        timestamp: new Date(),
+      };
+      
+      setMessages(prev => [...prev, fallbackResponse]);
+      console.error('Chat Error:', error);
+    } finally {
+      setIsLoading(false);
+      // Scroll to bottom after response
+      setTimeout(() => {
+        flatListRef.current?.scrollToEnd({ animated: true });
+      }, 100);
     }
   };
-
   const renderMessage = ({ item }: { item: Message }) => (
     <View style={[styles.messageContainer, item.isUser ? styles.userMessage : styles.botMessage]}>
       <View style={[styles.messageBubble, item.isUser ? styles.userBubble : styles.botBubble]}>
-        <Text style={[styles.messageText, item.isUser ? styles.userText : styles.botText]}>
-          {item.text}
-        </Text>
-        <Text style={[styles.messageTime, item.isUser ? styles.userTime : styles.botTime]}>
-          {item.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-        </Text>
+        {item.isLoading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="small" color="#9a0f21" />
+            <Text style={styles.loadingText}>Rektörün yazıyor...</Text>
+          </View>        ) : (
+          <>
+            <Text style={[styles.messageText, item.isUser ? styles.userText : styles.botText]}>
+              {item.text || ''}
+            </Text>
+            <Text style={[styles.messageTime, item.isUser ? styles.userTime : styles.botTime]}>
+              {item.timestamp ? item.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
+            </Text>
+          </>
+        )}
       </View>
     </View>
   );
@@ -106,10 +214,9 @@ const AIChatScreen = () => {
         <View style={styles.headerAvatar}>
           <MaterialIcons name="smart-toy" size={24} color="#fff" />
         </View>
-      </View>
-
-      {/* Messages */}
+      </View>      {/* Messages */}
       <FlatList
+        ref={flatListRef}
         data={messages}
         renderItem={renderMessage}
         keyExtractor={(item) => item.id}
@@ -133,17 +240,20 @@ const AIChatScreen = () => {
           placeholderTextColor="#999"
           multiline
           maxLength={500}
-        />
-        <TouchableOpacity 
+        />        <TouchableOpacity 
           style={[styles.sendButton, inputText.trim() ? styles.sendButtonActive : null]}
           onPress={handleSendMessage}
-          disabled={!inputText.trim()}
+          disabled={!inputText.trim() || isLoading}
         >
-          <MaterialIcons 
-            name="send" 
-            size={20} 
-            color={inputText.trim() ? "#fff" : "#999"} 
-          />
+          {isLoading ? (
+            <ActivityIndicator size="small" color="#fff" />
+          ) : (
+            <MaterialIcons 
+              name="send" 
+              size={20} 
+              color={inputText.trim() ? "#fff" : "#999"} 
+            />
+          )}
         </TouchableOpacity>
       </View>
       </KeyboardAvoidingView>
@@ -279,9 +389,19 @@ const styles = StyleSheet.create({
     backgroundColor: '#f0f0f0',
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  sendButtonActive: {
+  },  sendButtonActive: {
     backgroundColor: '#9a0f21',
+  },
+  loadingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+  },
+  loadingText: {
+    marginLeft: 8,
+    fontSize: 14,
+    color: '#666',
+    fontStyle: 'italic',
   },
   bottomSpacing: {
     height: 20,
