@@ -10,18 +10,21 @@ import {
   View,
 } from 'react-native';
 
-interface CartItem {
+import { useCart } from './cart-context';
+
+interface ItemData {
   id: string;
   name: string;
   price: string;
   restaurantName: string;
-  quantity: number;
+  restaurantId: string;
 }
 
 const AddToCart = () => {
   const router = useRouter();
+  const { addToCart } = useCart();
   const { itemData } = useLocalSearchParams();
-  const [item, setItem] = useState<any>(null);
+  const [item, setItem] = useState<ItemData | null>(null);
   const [quantity, setQuantity] = useState(1);
 
   useEffect(() => {
@@ -52,16 +55,19 @@ const AddToCart = () => {
   const handleAddToCart = () => {
     if (!item) return;
 
-    // In a real app, you would save this to a cart context or state management
-    const cartItem: CartItem = {
-      id: item.id,
-      name: item.name,
-      price: item.price,
-      restaurantName: item.restaurantName || 'Unknown Restaurant',
-      quantity: quantity,
-    };
+    const numericPrice = parseFloat(item.price.replace(/[^\d.]/g, ''));
 
-    // For demo purposes, we'll just show an alert
+    addToCart(
+      {
+        id: item.id,
+        name: item.name,
+        price: numericPrice,
+        restaurantId: item.restaurantId,
+        restaurantName: item.restaurantName,
+      },
+      quantity
+    );
+
     Alert.alert(
       'Added to Cart!',
       `${quantity}x ${item.name} has been added to your cart.`,
@@ -69,10 +75,14 @@ const AddToCart = () => {
         {
           text: 'Continue Shopping',
           onPress: () => router.back(),
+          style: 'cancel',
         },
         {
           text: 'View Cart',
-          onPress: () => router.push('/(app)/(protected)/food/cart'),
+          onPress: () => {
+            router.back(); // Close the modal first
+            router.push('/(app)/(protected)/food/cart');
+          },
         },
       ]
     );
@@ -175,7 +185,7 @@ const AddToCart = () => {
         </TouchableOpacity>
 
         {/* Additional Options */}
-        <View style={styles.optionsContainer}>
+        {/* <View style={styles.optionsContainer}>
           <TouchableOpacity style={styles.optionButton}>
             <MaterialIcons name="note-add" size={20} color="#666" />
             <Text style={styles.optionText}>Add special instructions</Text>
@@ -185,7 +195,7 @@ const AddToCart = () => {
             <MaterialIcons name="favorite-border" size={20} color="#666" />
             <Text style={styles.optionText}>Add to favorites</Text>
           </TouchableOpacity>
-        </View>
+        </View> */}
 
         {/* Bottom Spacing for Tab Navigation */}
         <View style={styles.bottomSpacing} />

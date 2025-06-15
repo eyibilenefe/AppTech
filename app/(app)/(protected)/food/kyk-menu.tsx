@@ -172,14 +172,6 @@ const KYKMenu = () => {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={handleBackPress}>
-          <MaterialIcons name="arrow-back" size={24} color="#000" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>KYK Menu</Text>
-        <View style={{ width: 24 }} />
-      </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Menu Card */}

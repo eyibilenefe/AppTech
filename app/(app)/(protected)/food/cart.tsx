@@ -1,6 +1,6 @@
 import { MaterialIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import React, { useState } from 'react';
+import React from 'react';
 import {
   Alert,
   SafeAreaView,
@@ -11,58 +11,20 @@ import {
   View,
 } from 'react-native';
 
-interface CartItem {
-  id: string;
-  name: string;
-  price: string;
-  quantity: number;
-  restaurantName: string;
-}
-
-// Dummy cart data
-const dummyCartItems: CartItem[] = [
-  {
-    id: '1',
-    name: 'Grilled Chicken',
-    price: '35₺',
-    quantity: 2,
-    restaurantName: 'Campus Cafeteria',
-  },
-  {
-    id: '2',
-    name: 'Turkish Tea',
-    price: '5₺',
-    quantity: 1,
-    restaurantName: 'Campus Cafeteria',
-  },
-  {
-    id: '3',
-    name: 'Kebab',
-    price: '45₺',
-    quantity: 1,
-    restaurantName: 'Student Restaurant',
-  },
-];
+import { CartItem, useCart } from './cart-context';
 
 const Cart = () => {
   const router = useRouter();
-  const [cartItems, setCartItems] = useState(dummyCartItems);
+  const { 
+    cart, 
+    updateQuantity, 
+    removeFromCart, 
+    clearCart,
+    cartTotal
+  } = useCart();
 
   const handleBackPress = () => {
     router.back();
-  };
-
-  const handleQuantityChange = (itemId: string, newQuantity: number) => {
-    if (newQuantity === 0) {
-      handleRemoveItem(itemId);
-      return;
-    }
-
-    setCartItems(prevItems =>
-      prevItems.map(item =>
-        item.id === itemId ? { ...item, quantity: newQuantity } : item
-      )
-    );
   };
 
   const handleRemoveItem = (itemId: string) => {
@@ -74,9 +36,7 @@ const Cart = () => {
         {
           text: 'Remove',
           style: 'destructive',
-          onPress: () => {
-            setCartItems(prevItems => prevItems.filter(item => item.id !== itemId));
-          },
+          onPress: () => removeFromCart(itemId),
         },
       ]
     );
@@ -91,14 +51,14 @@ const Cart = () => {
         {
           text: 'Clear All',
           style: 'destructive',
-          onPress: () => setCartItems([]),
+          onPress: () => clearCart(),
         },
       ]
     );
   };
 
   const handleGiveOrder = () => {
-    if (cartItems.length === 0) {
+    if (cart.length === 0) {
       Alert.alert('Empty Cart', 'Please add items to your cart before placing an order.');
       return;
     }
@@ -106,7 +66,7 @@ const Cart = () => {
   };
 
   // Group items by restaurant
-  const groupedItems = cartItems.reduce((groups, item) => {
+  const groupedItems = cart.reduce((groups, item) => {
     const restaurant = item.restaurantName;
     if (!groups[restaurant]) {
       groups[restaurant] = [];
@@ -117,27 +77,27 @@ const Cart = () => {
 
   // Calculate totals
   const calculateItemTotal = (item: CartItem) => {
-    const price = parseFloat(item.price.replace(/[^\d.]/g, ''));
-    return price * item.quantity;
+    return item.price * item.quantity;
   };
 
   const calculateRestaurantTotal = (items: CartItem[]) => {
     return items.reduce((total, item) => total + calculateItemTotal(item), 0);
   };
 
-  const grandTotal = cartItems.reduce((total, item) => total + calculateItemTotal(item), 0);
+  const grandTotal = cartTotal;
+  const serviceFee = 5;
 
   const renderCartItem = (item: CartItem) => (
     <View key={item.id} style={styles.cartItem}>
       <View style={styles.itemInfo}>
         <Text style={styles.itemName}>{item.name}</Text>
-        <Text style={styles.itemPrice}>{item.price}</Text>
+        <Text style={styles.itemPrice}>{item.price.toFixed(2)}₺</Text>
       </View>
 
       <View style={styles.quantityControls}>
         <TouchableOpacity
           style={styles.quantityButton}
-          onPress={() => handleQuantityChange(item.id, item.quantity - 1)}
+          onPress={() => updateQuantity(item.id, item.quantity - 1)}
         >
           <MaterialIcons name="remove" size={20} color="#9a0f21" />
         </TouchableOpacity>
@@ -146,7 +106,7 @@ const Cart = () => {
 
         <TouchableOpacity
           style={styles.quantityButton}
-          onPress={() => handleQuantityChange(item.id, item.quantity + 1)}
+          onPress={() => updateQuantity(item.id, item.quantity + 1)}
         >
           <MaterialIcons name="add" size={20} color="#9a0f21" />
         </TouchableOpacity>
@@ -161,7 +121,7 @@ const Cart = () => {
     </View>
   );
 
-  if (cartItems.length === 0) {
+  if (cart.length === 0) {
     return (
       <SafeAreaView style={styles.container}>
         {/* Header */}
@@ -169,8 +129,10 @@ const Cart = () => {
           <TouchableOpacity onPress={handleBackPress}>
             <MaterialIcons name="arrow-back" size={24} color="#000" />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Cart</Text>
-          <View style={{ width: 24 }} />
+          <Text style={styles.headerTitle}>Cart ({cart.length} items)</Text>
+          <TouchableOpacity onPress={handleClearCart}>
+            <MaterialIcons name="clear-all" size={24} color="#FF4757" />
+          </TouchableOpacity>
         </View>
 
         <View style={styles.emptyCartContainer}>
@@ -181,7 +143,7 @@ const Cart = () => {
           </Text>
           <TouchableOpacity
             style={styles.browseButton}
-            onPress={() => router.push('/(app)/(protected)/food')}
+            onPress={() => router.back()}
           >
             <Text style={styles.browseButtonText}>Browse Restaurants</Text>
           </TouchableOpacity>
@@ -197,7 +159,7 @@ const Cart = () => {
         <TouchableOpacity onPress={handleBackPress}>
           <MaterialIcons name="arrow-back" size={24} color="#000" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Cart ({cartItems.length} items)</Text>
+        <Text style={styles.headerTitle}>Cart ({cart.length} items)</Text>
         <TouchableOpacity onPress={handleClearCart}>
           <MaterialIcons name="clear-all" size={24} color="#FF4757" />
         </TouchableOpacity>
@@ -216,7 +178,7 @@ const Cart = () => {
 
             <View style={styles.restaurantTotal}>
               <Text style={styles.restaurantTotalText}>
-                Subtotal: {calculateRestaurantTotal(items).toFixed(0)}₺
+                Subtotal: {calculateRestaurantTotal(items).toFixed(2)}₺
               </Text>
             </View>
           </View>
@@ -228,7 +190,7 @@ const Cart = () => {
           
           <View style={styles.summaryRow}>
             <Text style={styles.summaryLabel}>Items Total:</Text>
-            <Text style={styles.summaryValue}>{grandTotal.toFixed(0)}₺</Text>
+            <Text style={styles.summaryValue}>{grandTotal.toFixed(2)}₺</Text>
           </View>
           
           <View style={styles.summaryRow}>
@@ -238,12 +200,12 @@ const Cart = () => {
           
           <View style={styles.summaryRow}>
             <Text style={styles.summaryLabel}>Service Fee:</Text>
-            <Text style={styles.summaryValue}>5₺</Text>
+            <Text style={styles.summaryValue}>{serviceFee.toFixed(2)}₺</Text>
           </View>
           
           <View style={[styles.summaryRow, styles.totalRow]}>
             <Text style={styles.totalLabel}>Total:</Text>
-            <Text style={styles.totalValue}>{(grandTotal + 5).toFixed(0)}₺</Text>
+            <Text style={styles.totalValue}>{(grandTotal + serviceFee).toFixed(2)}₺</Text>
           </View>
         </View>
 

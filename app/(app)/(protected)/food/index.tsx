@@ -1,9 +1,11 @@
 import { MaterialIcons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
-import React, { useState } from 'react';
+import { useFocusEffect, useRouter } from 'expo-router';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
+  ActivityIndicator,
   Dimensions,
   FlatList,
+  RefreshControl,
   SafeAreaView,
   ScrollView,
   StyleSheet,
@@ -12,21 +14,30 @@ import {
   View
 } from 'react-native';
 
+import { useSupabase } from '@/context/supabase-provider';
+import { supabase } from '@/utils/supabase';
+
+interface MenuItem {
+  id: string;
+  name: string;
+  price: string;
+  description?: string | null;
+  calories?: number | null;
+}
+
+interface Category {
+  id:string;
+  name: string;
+  items: MenuItem[];
+}
+
 interface Restaurant {
   id: string;
   name: string;
   hours: string;
   location: string;
   phone: string;
-  categories: Array<{
-    id: string;
-    name: string;
-    items: Array<{
-      id: string;
-      name: string;
-      price: string;
-    }>;
-  }>;
+  categories: Category[];
 }
 
 interface Announcement {
@@ -35,93 +46,165 @@ interface Announcement {
   subtitle: string;
   description: string;
   backgroundColor: string;
-  icon: string;
+  icon: keyof typeof MaterialIcons.glyphMap;
   action?: string;
+}
+
+interface ActiveOrder {
+  id: string;
 }
 
 const { width } = Dimensions.get('window');
 
-const dummyAnnouncements: Announcement[] = [
-  {
-    id: '1',
-    title: 'Special Lunch Menu',
-    subtitle: 'Today Only!',
-    description: 'Try our new Mediterranean dishes with 20% discount',
-    backgroundColor: '#FF6B35',
-    icon: 'restaurant-menu',
-    action: 'View Menu',
-  },
-  {
-    id: '2',
-    title: 'Extended Hours',
-    subtitle: 'Weekend Special',
-    description: 'Campus Cafeteria now open until midnight on weekends',
-    backgroundColor: '#9a0f21',
-    icon: 'access-time',
-  },
-  {
-    id: '3',
-    title: 'New Payment Method',
-    subtitle: 'Coming Soon',
-    description: 'Student card payments will be available next week',
-    backgroundColor: '#4CAF50',
-    icon: 'payment',
-  },
-];
-
-const dummyRestaurants: Restaurant[] = [
-  {
-    id: '1',
-    name: 'Campus Cafeteria',
-    hours: '07:00 - 22:00',
-    location: 'Main Building',
-    phone: '+90 555 123 4567',
-    categories: [
-      {
-        id: '1',
-        name: 'Main Dishes',
-        items: [
-          { id: '1', name: 'Grilled Chicken', price: '35₺' },
-          { id: '2', name: 'Pasta Alfredo', price: '28₺' },
-          { id: '3', name: 'Fish & Chips', price: '42₺' },
-        ],
-      },
-      {
-        id: '2',
-        name: 'Beverages',
-        items: [
-          { id: '4', name: 'Turkish Tea', price: '5₺' },
-          { id: '5', name: 'Coffee', price: '12₺' },
-          { id: '6', name: 'Fresh Juice', price: '15₺' },
-        ],
-      },
-    ],
-  },
-  {
-    id: '2',
-    name: 'Student Restaurant',
-    hours: '08:00 - 20:00',
-    location: 'Dormitory Area',
-    phone: '+90 555 987 6543',
-    categories: [
-      {
-        id: '3',
-        name: 'Traditional',
-        items: [
-          { id: '7', name: 'Kebab', price: '45₺' },
-          { id: '8', name: 'Pide', price: '25₺' },
-        ],
-      },
-    ],
-  },
+const announcementVisuals = [
+  { backgroundColor: '#FF6B35', icon: 'restaurant-menu' as const },
+  { backgroundColor: '#9a0f21', icon: 'access-time' as const },
+  { backgroundColor: '#4CAF50', icon: 'payment' as const },
+  { backgroundColor: '#2196F3', icon: 'info' as const },
+  { backgroundColor: '#E91E63', icon: 'new-releases' as const },
 ];
 
 const FoodHomeScreen = () => {
   const router = useRouter();
+  const { user } = useSupabase();
   const [selectedToggle, setSelectedToggle] = useState<'KYK' | 'Cafeteria'>('Cafeteria');
   const [expandedRestaurant, setExpandedRestaurant] = useState<string | null>(null);
   const [expandedCategories, setExpandedCategories] = useState<{[key: string]: boolean}>({});
 
+  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
+  const [loadingAnnouncements, setLoadingAnnouncements] = useState(true);
+  const [errorAnnouncements, setErrorAnnouncements] = useState<string | null>(null);
+
+  const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
+  const [loadingRestaurants, setLoadingRestaurants] = useState(true);
+  const [errorRestaurants, setErrorRestaurants] = useState<string | null>(null);
+
+  const [activeOrder, setActiveOrder] = useState<ActiveOrder | null>(null);
+  const [loadingActiveOrder, setLoadingActiveOrder] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const loadData = useCallback(async () => {
+    // Don't show individual loaders on pull-to-refresh
+    if (!refreshing) {
+      setLoadingAnnouncements(true);
+      setLoadingRestaurants(true);
+      setLoadingActiveOrder(true);
+    }
+    setErrorAnnouncements(null);
+    setErrorRestaurants(null);
+
+    const today = new Date().toISOString().split('T')[0];
+    
+    const announcementsPromise = supabase
+      .from('announcements')
+      .select('*, restaurants(name)')
+      .lte('start_date', today)
+      .gte('end_date', today)
+      .order('posted_at', { ascending: false });
+
+    const restaurantsPromise = supabase
+      .from('restaurants')
+      .select(`
+        id, name, open_time, close_time, location, tel_no,
+        restaurant_categories (categories (id, name)),
+        menu_items (id, name, price, description, calories, category_id)
+      `);
+
+    const activeOrderPromise = user
+      ? supabase
+          .from('orders')
+          .select('id')
+          .not('status', 'in', '(delivered,cancelled)')
+          .eq('user_id', user.id)
+          .order('order_time', { ascending: false })
+          .limit(1)
+          .single()
+      : Promise.resolve({ data: null, error: null });
+
+    console.log('activeOrderPromise', activeOrderPromise);
+
+    try {
+      const [announcementsResult, restaurantsResult, activeOrderResult] = await Promise.all([
+        announcementsPromise,
+        restaurantsPromise,
+        activeOrderPromise,
+      ]);
+
+      if (announcementsResult.error) throw announcementsResult.error;
+      const formattedAnnouncements = announcementsResult.data.map((item, index) => {
+        const visual = announcementVisuals[index % announcementVisuals.length];
+        return {
+          id: item.id,
+          title: item.title,
+          subtitle: (item as any).restaurants?.name || 'Campus Announcement',
+          description: item.content,
+          backgroundColor: visual.backgroundColor,
+          icon: visual.icon,
+        };
+      });
+      setAnnouncements(formattedAnnouncements);
+
+      if (restaurantsResult.error) throw restaurantsResult.error;
+      if (restaurantsResult.data) {
+        const formattedRestaurants: Restaurant[] = restaurantsResult.data.map((r: any) => {
+          const categories = r.restaurant_categories.map((rc: any) => {
+            const category = rc.categories;
+            const menuItems = r.menu_items
+              .filter((item: any) => item.category_id === category.id)
+              .map((item: any) => ({
+                id: item.id,
+                name: item.name,
+                price: `${item.price}₺`,
+                description: item.description,
+                calories: item.calories,
+              }));
+            return { id: category.id, name: category.name, items: menuItems };
+          });
+          return {
+            id: r.id,
+            name: r.name,
+            hours: `${String(r.open_time).slice(0, 5)} - ${String(r.close_time).slice(0, 5)}`,
+            location: r.location,
+            phone: r.tel_no,
+            categories: categories,
+          };
+        });
+        setRestaurants(formattedRestaurants);
+      }
+      
+      if (activeOrderResult.error && activeOrderResult.error.code !== 'PGRST116') {
+        throw activeOrderResult.error;
+      }
+      setActiveOrder(activeOrderResult.data as ActiveOrder | null);
+
+    } catch (err: any) {
+      setErrorAnnouncements(err.message || 'Failed to fetch data.');
+      setErrorRestaurants(err.message || 'Failed to fetch data.');
+      console.error('Error fetching data:', err);
+    } finally {
+      if (!refreshing) {
+        setLoadingAnnouncements(false);
+        setLoadingRestaurants(false);
+        setLoadingActiveOrder(false);
+      }
+    }
+  }, [user, refreshing]);
+  
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+  }, []);
+
+  useEffect(() => {
+    if (refreshing) {
+      loadData().finally(() => setRefreshing(false));
+    }
+  }, [refreshing, loadData]);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadData();
+    }, [loadData])
+  );
 
   const handleRestaurantPress = (restaurantId: string) => {
     setExpandedRestaurant(expandedRestaurant === restaurantId ? null : restaurantId);
@@ -149,11 +232,11 @@ const FoodHomeScreen = () => {
     });
   };
 
-  const handleAddToCart = (item: any, restaurantName: string) => {
+  const handleAddToCart = (item: any, restaurantName: string, restaurantId: string) => {
     router.push({
       pathname: '/(app)/(protected)/food/add-to-cart',
       params: { 
-        itemData: JSON.stringify({ ...item, restaurantName })
+        itemData: JSON.stringify({ ...item, restaurantName, restaurantId })
       }
     });
   };
@@ -162,7 +245,7 @@ const FoodHomeScreen = () => {
     <View style={[styles.announcementCard, { backgroundColor: item.backgroundColor }]}>
       <View style={styles.announcementContent}>
         <View style={styles.announcementHeader}>
-          <MaterialIcons name={item.icon as any} size={32} color="#fff" />
+          <MaterialIcons name={item.icon} size={32} color="#fff" />
           <View style={styles.announcementBadge}>
             <Text style={styles.announcementSubtitle}>{item.subtitle}</Text>
           </View>
@@ -194,10 +277,7 @@ const FoodHomeScreen = () => {
           </View>
           <View style={styles.restaurantActions}>
             <TouchableOpacity onPress={() => handleRestaurantDetailPress(restaurant)}>
-              <MaterialIcons name="location-on" size={20} color="#666" />
-            </TouchableOpacity>
-            <TouchableOpacity>
-              <MaterialIcons name="phone" size={20} color="#666" />
+              <MaterialIcons name="directions" size={20} color="#666" />
             </TouchableOpacity>
             <TouchableOpacity onPress={() => handleRestaurantPress(restaurant.id)}>
               <MaterialIcons 
@@ -236,7 +316,7 @@ const FoodHomeScreen = () => {
                         </View>
                         <TouchableOpacity
                           style={styles.addToCartButton}
-                          onPress={() => handleAddToCart(item, restaurant.name)}
+                          onPress={() => handleAddToCart(item, restaurant.name, restaurant.id)}
                         >
                           <MaterialIcons name="add-shopping-cart" size={20} color="#9a0f21" />
                         </TouchableOpacity>
@@ -256,29 +336,39 @@ const FoodHomeScreen = () => {
     <SafeAreaView style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity>
-          <MaterialIcons name="menu" size={24} color="#000" />
-        </TouchableOpacity>
+        <Text></Text>
         <Text style={styles.headerTitle}>Food & Dining</Text>
-        <TouchableOpacity>
-          <MaterialIcons name="search" size={24} color="#000" />
-        </TouchableOpacity>
+        <Text></Text>
       </View>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView 
+        style={styles.content} 
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
+      >
         {/* Announcements Section */}
         <View style={styles.announcementsSection}>
           <Text style={styles.sectionTitle}>Latest Announcements</Text>
-          <FlatList
-            data={dummyAnnouncements}
-            renderItem={renderAnnouncementCard}
-            keyExtractor={(item) => item.id}
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            snapToInterval={width - 48}
-            decelerationRate="fast"
-            contentContainerStyle={styles.announcementsList}
-          />
+          {loadingAnnouncements ? (
+            <ActivityIndicator size="large" color="#9a0f21" style={{ marginTop: 20 }} />
+          ) : errorAnnouncements ? (
+            <Text style={styles.errorText}>{errorAnnouncements}</Text>
+          ) : announcements.length === 0 ? (
+            <Text style={styles.noItemsText}>No announcements right now.</Text>
+          ) : (
+            <FlatList
+              data={announcements}
+              renderItem={renderAnnouncementCard}
+              keyExtractor={(item) => item.id}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              snapToInterval={width - 48}
+              decelerationRate="fast"
+              contentContainerStyle={styles.announcementsList}
+            />
+          )}
         </View>
 
         {/* Quick Access Buttons */}
@@ -324,12 +414,18 @@ const FoodHomeScreen = () => {
         {/* Restaurants List */}
         <View style={styles.restaurantsSection}>
           <Text style={styles.sectionTitle}>All Restaurants</Text>
-          <FlatList
-            data={dummyRestaurants}
-            renderItem={renderRestaurant}
-            keyExtractor={(item) => item.id}
-            scrollEnabled={false}
-          />
+          {loadingRestaurants ? (
+            <ActivityIndicator size="large" color="#9a0f21" style={{ marginTop: 20 }} />
+          ) : errorRestaurants ? (
+            <Text style={styles.errorText}>{errorRestaurants}</Text>
+          ) : (
+            <FlatList
+              data={restaurants}
+              renderItem={renderRestaurant}
+              keyExtractor={(item) => item.id}
+              scrollEnabled={false}
+            />
+          )}
         </View>
 
         {/* Bottom Spacing for Tab Navigation */}
@@ -337,13 +433,30 @@ const FoodHomeScreen = () => {
       </ScrollView>
 
       {/* Floating Cart Button */}
-      <TouchableOpacity
-        style={styles.floatingCartButton}
-        onPress={() => router.push('/(app)/(protected)/food/cart')}
-      >
-        <MaterialIcons name="shopping-cart" size={24} color="#fff" />
-        <Text style={styles.cartButtonText}>Cart</Text>
-      </TouchableOpacity>
+      {loadingActiveOrder ? (
+        <View style={styles.floatingCartButton}>
+          <ActivityIndicator size="small" color="#fff" />
+        </View>
+      ) : activeOrder ? (
+        <TouchableOpacity
+          style={styles.floatingCartButton}
+          onPress={() => router.push({
+            pathname: '/(app)/(protected)/food/order-status',
+            params: { orderId: activeOrder.id }
+          })}
+        >
+          <MaterialIcons name="track-changes" size={24} color="#fff" />
+          <Text style={styles.cartButtonText}>Track Order</Text>
+        </TouchableOpacity>
+      ) : (
+        <TouchableOpacity
+          style={styles.floatingCartButton}
+          onPress={() => router.push('/(app)/(protected)/food/cart')}
+        >
+          <MaterialIcons name="shopping-cart" size={24} color="#fff" />
+          <Text style={styles.cartButtonText}>Cart</Text>
+        </TouchableOpacity>
+      )}
     </SafeAreaView>
   );
 };
@@ -359,7 +472,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 20,
     paddingVertical: 15,
-    borderBottomWidth: 1,
     borderBottomColor: '#f0f0f0',
   },
   headerTitle: {
@@ -373,6 +485,7 @@ const styles = StyleSheet.create({
   announcementsSection: {
     marginTop: 16,
     marginBottom: 24,
+    minHeight: 150,
   },
   sectionTitle: {
     fontSize: 18,
@@ -436,6 +549,18 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 14,
     fontWeight: '600',
+  },
+  errorText: {
+    textAlign: 'center',
+    color: '#D32F2F',
+    marginTop: 20,
+    marginHorizontal: 16,
+  },
+  noItemsText: {
+    textAlign: 'center',
+    color: '#666',
+    marginTop: 20,
+    fontStyle: 'italic',
   },
   quickAccessSection: {
     marginBottom: 24,

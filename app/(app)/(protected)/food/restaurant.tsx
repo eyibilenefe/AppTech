@@ -2,13 +2,18 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
-    SafeAreaView,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
+
+import { useSupabase } from '@/context/supabase-provider';
+import { supabase } from '@/utils/supabase';
 
 interface MenuItem {
   id: string;
@@ -33,9 +38,12 @@ interface Restaurant {
 
 const RestaurantDetail = () => {
   const router = useRouter();
+  const { user } = useSupabase();
   const { restaurantData } = useLocalSearchParams();
   const [restaurant, setRestaurant] = useState<Restaurant | null>(null);
   const [expandedCategories, setExpandedCategories] = useState<{[key: string]: boolean}>({});
+  const [isLoved, setIsLoved] = useState(false);
+  const [isLoadingLove, setIsLoadingLove] = useState(false);
 
   useEffect(() => {
     if (restaurantData && typeof restaurantData === 'string') {
@@ -47,6 +55,32 @@ const RestaurantDetail = () => {
       }
     }
   }, [restaurantData]);
+
+  useEffect(() => {
+    const checkIfLoved = async () => {
+      if (!user || !restaurant) return;
+
+      try {
+        const { data, error } = await supabase
+          .from('user_restaurants')
+          .select('*')
+          .eq('user_id', user.id)
+          .eq('restaurant_id', restaurant.id)
+          .single();
+
+        if (error && error.code !== 'PGRST116') {
+          console.error('Error checking loved status:', error);
+          return;
+        }
+
+        setIsLoved(!!data);
+      } catch (error) {
+        console.error('Error checking loved status:', error);
+      }
+    };
+
+    checkIfLoved();
+  }, [user, restaurant]);
 
   const handleBackPress = () => {
     router.back();
@@ -62,10 +96,57 @@ const RestaurantDetail = () => {
   const handleAddToCart = (item: MenuItem) => {
     router.push({
       pathname: '/(app)/(protected)/food/add-to-cart',
-      params: { 
-        itemData: JSON.stringify({ ...item, restaurantName: restaurant?.name })
-      }
+      params: {
+        itemData: JSON.stringify({
+          ...item,
+          restaurantName: restaurant?.name,
+          restaurantId: restaurant?.id,
+        }),
+      },
     });
+  };
+
+  const handleLovePress = async () => {
+    if (!user || !restaurant) {
+      Alert.alert('Error', 'Please log in to save restaurants.');
+      return;
+    }
+
+    setIsLoadingLove(true);
+
+    try {
+      if (isLoved) {
+        // Remove from favorites
+        const { error } = await supabase
+          .from('user_restaurants')
+          .delete()
+          .eq('user_id', user.id)
+          .eq('restaurant_id', restaurant.id);
+
+        if (error) throw error;
+
+        setIsLoved(false);
+        Alert.alert('Success', 'Restaurant removed from favorites!');
+      } else {
+        // Add to favorites
+        const { error } = await supabase
+          .from('user_restaurants')
+          .insert({
+            user_id: user.id,
+            restaurant_id: restaurant.id,
+          });
+
+        if (error) throw error;
+
+        setIsLoved(true);
+        Alert.alert('Success', 'Restaurant added to favorites!');
+      }
+    } catch (error: any) {
+      console.error('Error updating favorite status:', error);
+      Alert.alert('Error', error.message || 'Failed to update favorite status.');
+    } finally {
+      setIsLoadingLove(false);
+    }
   };
 
   if (!restaurant) {
@@ -86,7 +167,17 @@ const RestaurantDetail = () => {
           <MaterialIcons name="arrow-back" size={24} color="#000" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>{restaurant.name}</Text>
-        <View style={{ width: 24 }} />
+        <TouchableOpacity onPress={handleLovePress} disabled={isLoadingLove}>
+          {isLoadingLove ? (
+            <ActivityIndicator size="small" color="#9a0f21" />
+          ) : (
+            <MaterialIcons 
+              name={isLoved ? "favorite" : "favorite-border"} 
+              size={24} 
+              color={isLoved ? "#9a0f21" : "#666"} 
+            />
+          )}
+        </TouchableOpacity>
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
@@ -150,25 +241,18 @@ const RestaurantDetail = () => {
           ))}
         </View>
 
-        {/* Action Buttons */}
-        <View style={styles.actionButtonsContainer}>
-          <TouchableOpacity 
-            style={styles.actionButton}
-            onPress={() => router.push('/(app)/(protected)/food/cart')}
-          >
-            <MaterialIcons name="shopping-cart" size={24} color="#fff" />
-            <Text style={styles.actionButtonText}>View Cart</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={[styles.actionButton, styles.secondaryButton]}>
-            <MaterialIcons name="directions" size={24} color="#9a0f21" />
-            <Text style={[styles.actionButtonText, styles.secondaryButtonText]}>Get Directions</Text>
-          </TouchableOpacity>
-        </View>
-
         {/* Bottom Spacing for Tab Navigation */}
         <View style={styles.bottomSpacing} />
       </ScrollView>
+
+      {/* Floating Cart Button */}
+      <TouchableOpacity
+        style={styles.floatingCartButton}
+        onPress={() => router.push('/(app)/(protected)/food/cart')}
+      >
+        <MaterialIcons name="shopping-cart" size={24} color="#fff" />
+        <Text style={styles.cartButtonText}>Cart</Text>
+      </TouchableOpacity>
     </SafeAreaView>
   );
 };
@@ -176,7 +260,6 @@ const RestaurantDetail = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
   },
   header: {
     flexDirection: 'row',
@@ -184,7 +267,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 16,
     paddingVertical: 12,
-    backgroundColor: '#fff',
     borderBottomWidth: 1,
     borderBottomColor: '#e0e0e0',
     shadowColor: '#000',
@@ -288,34 +370,30 @@ const styles = StyleSheet.create({
     padding: 8,
     marginLeft: 12,
   },
-  actionButtonsContainer: {
-    gap: 12,
-    marginBottom: 20,
-  },
-  actionButton: {
+  floatingCartButton: {
+    position: 'absolute',
+    bottom: 120,
+    right: 16,
     backgroundColor: '#9a0f21',
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 16,
-    borderRadius: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 25,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
     gap: 8,
   },
-  actionButtonText: {
+  cartButtonText: {
     color: '#fff',
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '600',
   },
-  secondaryButton: {
-    backgroundColor: 'transparent',
-    borderWidth: 2,
-    borderColor: '#9a0f21',
-  },
-  secondaryButtonText: {
-    color: '#9a0f21',
-  },
   bottomSpacing: {
-    height: 100,
+    height: 120,
   },
 });
 

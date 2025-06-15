@@ -10,11 +10,9 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   TouchableOpacity,
   View
 } from 'react-native';
-import StarRating from '../../../../components/StarRating';
 import { supabase } from '../../../../utils/supabase';
 
 interface MealItem {
@@ -319,14 +317,6 @@ const CafeteriaMenu = () => {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={handleBackPress}>
-          <MaterialIcons name="arrow-back" size={24} color="#000" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Cafeteria Menu</Text>
-        <View style={{ width: 24 }} />
-      </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Date Selector */}
@@ -434,67 +424,6 @@ const CafeteriaMenu = () => {
                   <Text style={styles.calorieText}>Total Calories</Text>
                   <Text style={styles.calorieValue}>{totalCalories} cal</Text>
                 </View>
-              </View>
-            )}
-          </View>
-        )}
-
-        {/* Review Section - Only for Today and when menu is available */}
-        {!loading && selectedDate === getCurrentDate() && menuAvailable && (
-          <View style={styles.reviewCard}>
-            <Text style={styles.reviewTitle}>Rate Today's Lunch</Text>
-            
-            {userReview ? (
-              <View style={styles.existingReview}>
-                <Text style={styles.existingReviewText}>
-                  You've already reviewed today's lunch
-                </Text>
-                <View style={styles.existingReviewScore}>
-                  <StarRating rating={userReview.score} disabled size={20} />
-                  <Text style={styles.existingReviewScoreText}>
-                    {userReview.score.toFixed(1)}/10
-                  </Text>
-                </View>
-                {userReview.comment && (
-                  <Text style={styles.existingReviewComment}>
-                    "{userReview.comment}"
-                  </Text>
-                )}
-              </View>
-            ) : (
-              <View style={styles.reviewForm}>
-                <View style={styles.scoreSection}>
-                  <Text style={styles.scoreLabel}>Your Score: {reviewScore.toFixed(1)}/10</Text>
-                  <StarRating rating={reviewScore} setRating={setReviewScore} />
-                </View>
-
-                <View style={styles.commentSection}>
-                  <Text style={styles.commentLabel}>Comment (optional):</Text>
-                  <TextInput
-                    style={styles.commentInput}
-                    value={reviewComment}
-                    onChangeText={setReviewComment}
-                    placeholder="Share your thoughts about today's lunch..."
-                    multiline
-                    numberOfLines={3}
-                    maxLength={200}
-                  />
-                </View>
-
-                <TouchableOpacity
-                  style={[styles.submitButton, submittingReview && styles.submitButtonDisabled]}
-                  onPress={submitReview}
-                  disabled={submittingReview}
-                >
-                  {submittingReview ? (
-                    <ActivityIndicator size="small" color="#fff" />
-                  ) : (
-                    <>
-                      <MaterialIcons name="rate-review" size={20} color="#fff" />
-                      <Text style={styles.submitButtonText}>Submit Review</Text>
-                    </>
-                  )}
-                </TouchableOpacity>
               </View>
             )}
           </View>

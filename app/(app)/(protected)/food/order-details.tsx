@@ -1,7 +1,8 @@
 import { MaterialIcons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
-import React, { useState } from 'react';
+import { useFocusEffect, useRouter } from 'expo-router';
+import React, { useCallback, useState } from 'react';
 import {
+  ActivityIndicator,
   Alert,
   SafeAreaView,
   ScrollView,
@@ -12,185 +13,333 @@ import {
   View,
 } from 'react-native';
 
-interface OrderItem {
+import { useSupabase } from '@/context/supabase-provider';
+import { supabase } from '@/utils/supabase';
+import { useCart } from './cart-context';
+import { defaultCampusLocations } from './locations';
+
+interface Address {
   id: string;
-  name: string;
-  price: string;
-  quantity: number;
-  restaurantName: string;
+  location: string;
+  description?: string | null;
+  is_default_campus?: boolean;
+  coordinates?: string | null;
+  is_default?: boolean;
 }
 
-// Dummy order items
-const dummyOrderItems: OrderItem[] = [
-  {
-    id: '1',
-    name: 'Grilled Chicken',
-    price: '35₺',
-    quantity: 2,
-    restaurantName: 'Campus Cafeteria',
-  },
-  {
-    id: '2',
-    name: 'Turkish Tea',
-    price: '5₺',
-    quantity: 1,
-    restaurantName: 'Campus Cafeteria',
-  },
-  {
-    id: '3',
-    name: 'Kebab',
-    price: '45₺',
-    quantity: 1,
-    restaurantName: 'Student Restaurant',
-  },
-];
-
-const deliveryLocations = [
-  'Dormitory Building A',
-  'Dormitory Building B',
-  'Dormitory Building C',
-  'Engineering Faculty',
-  'Library',
-  'Student Center',
-  'Sports Complex',
-  'Other (specify below)',
-];
+interface PaymentMethod {
+  id: string;
+  type: string;
+  name: string;
+}
 
 const OrderDetails = () => {
   const router = useRouter();
-  const [selectedLocation, setSelectedLocation] = useState('');
-  const [customLocation, setCustomLocation] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState('');
+  const { user } = useSupabase();
+  const { cart, cartTotal, restaurantId, clearCart } = useCart();
+  
+  const [allAddresses, setAllAddresses] = useState<Address[]>([]);
+  const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
+  
+  const [selectedAddress, setSelectedAddress] = useState<Address | null>(null);
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<PaymentMethod | null>(null);
+  
   const [orderNote, setOrderNote] = useState('');
-  const [isLocationDropdownOpen, setIsLocationDropdownOpen] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchData = useCallback(async () => {
+    if (!user) {
+      setError('You must be logged in to place an order.');
+      setLoading(false);
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setError(null);
+
+      const addressPromise = supabase.from('addresses').select('*').eq('user_id', user.id);
+      const paymentMethodPromise = supabase.from('payment_methods').select('*');
+
+      const [addressRes, paymentMethodRes] = await Promise.all([addressPromise, paymentMethodPromise]);
+
+      if (addressRes.error) throw addressRes.error;
+      if (paymentMethodRes.error) throw paymentMethodRes.error;
+
+      const userAddresses: Address[] = addressRes.data || [];
+      const campusAddresses: Address[] = defaultCampusLocations.map(loc => ({
+        id: loc.id,
+        location: loc.name,
+        description: loc.description,
+        is_default_campus: true,
+        coordinates: `${loc.coordinates.latitude}, ${loc.coordinates.longitude}`
+      }));
+
+      const combinedAddresses = [...campusAddresses, ...userAddresses];
+      setAllAddresses(combinedAddresses);
+      setPaymentMethods(paymentMethodRes.data || []);
+      
+      const defaultAddress = userAddresses.find(a => a.is_default) || combinedAddresses[0];
+      if (defaultAddress) {
+        setSelectedAddress(defaultAddress);
+      }
+
+    } catch (err: any) {
+      setError(err.message || 'Failed to load order details.');
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  }, [user]);
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchData();
+    }, [fetchData])
+  );
 
   const handleBackPress = () => {
     router.back();
   };
 
-  const handleConfirmOrder = () => {
-    if (!selectedLocation) {
-      Alert.alert('Missing Information', 'Please select a delivery location.');
+  const handleConfirmOrder = async () => {
+    if (!selectedAddress) {
+      Alert.alert('Missing Information', 'Please select a delivery address.');
       return;
     }
-
-    if (!paymentMethod) {
+    if (!selectedPaymentMethod) {
       Alert.alert('Missing Information', 'Please select a payment method.');
       return;
     }
-
-    if (selectedLocation === 'Other (specify below)' && !customLocation.trim()) {
-      Alert.alert('Missing Information', 'Please specify your custom delivery location.');
+    if (cart.length === 0) {
+      Alert.alert('Empty Cart', 'Your cart is empty. Add items to proceed.');
       return;
     }
 
-    // In a real app, you would process the order here
-    Alert.alert(
-      'Order Confirmed!',
-      'Your order has been confirmed and is being prepared.',
-      [
-        {
-          text: 'Track Order',
-          onPress: () => router.push('/(app)/(protected)/food/order-status'),
-        },
-      ]
-    );
+    if (!user) {
+      Alert.alert('Error', 'User information is missing. Please log in again.');
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      let finalAddressId = selectedAddress.id;
+
+      // If the selected address is a default campus location, ensure it exists in the DB for this user
+      if (selectedAddress.is_default_campus) {
+        const { data: existingAddress, error: findError } = await supabase
+          .from('addresses')
+          .select('id')
+          .eq('user_id', user.id)
+          .eq('location', selectedAddress.location)
+          .single();
+
+        if (findError && findError.code !== 'PGRST116') {
+          throw findError;
+        }
+        
+        if (existingAddress) {
+          finalAddressId = existingAddress.id;
+        } else {
+          const { data: newAddress, error: insertError } = await supabase
+            .from('addresses')
+            .insert({
+              location: selectedAddress.location,
+              description: selectedAddress.description,
+              coordinates: selectedAddress.coordinates,
+              is_default: false,
+              user_id: user.id,
+            })
+            .select('id')
+            .single();
+
+          if (insertError) throw insertError;
+          if (!newAddress) throw new Error('Failed to create new address entry.');
+          
+          finalAddressId = newAddress.id;
+        }
+      }
+
+      // Group cart items by restaurant
+      const ordersByRestaurant = cart.reduce<Record<string, typeof cart>>((acc, item) => {
+        const restaurantId = (item as any).restaurantId;
+        if (!restaurantId) {
+          throw new Error(`Cart item "${item.name}" is missing a restaurantId.`);
+        }
+        if (!acc[restaurantId]) {
+          acc[restaurantId] = [];
+        }
+        acc[restaurantId].push(item);
+        return acc;
+      }, {});
+      
+      const restaurantIds = Object.keys(ordersByRestaurant);
+      const createdOrders: { id: string }[] = [];
+
+      for (const restaurantId of restaurantIds) {
+        const { data: orderData, error } = await supabase
+          .from('orders')
+          .insert({
+            order_time: new Date().toISOString(),
+            message: orderNote.trim() || null,
+            status: 'pending',
+            user_id: user.id,
+            restaurant_id: restaurantId,
+            payment_method_id: selectedPaymentMethod.id,
+            address_id: finalAddressId,
+          })
+          .select('id')
+          .single();
+        
+        if (error) throw error;
+        if (!orderData) throw new Error(`Failed to create order for restaurant ${restaurantId}`);
+
+        // Note: For a complete implementation, you would also insert into `order_items` here.
+        // This change focuses on creating multiple parent order records as requested.
+        createdOrders.push(orderData);
+      }
+
+      if (createdOrders.length === 1) {
+        Alert.alert(
+          'Order Confirmed!',
+          'Your order has been placed successfully.',
+          [
+            {
+              text: 'Track Order',
+              onPress: () => {
+                clearCart();
+                router.replace({
+                  pathname: '/(app)/(protected)/food/order-status',
+                  params: { orderId: createdOrders[0].id },
+                });
+              },
+            },
+          ]
+        );
+      } else {
+         Alert.alert(
+          'Orders Confirmed!',
+          `Your ${createdOrders.length} orders from different restaurants have been placed successfully.`,
+          [
+            {
+              text: 'OK',
+              onPress: () => {
+                clearCart();
+                router.replace('/(app)/(protected)/food');
+              },
+            },
+          ]
+        );
+      }
+
+    } catch (err: any) {
+      console.error('Failed to place order(s):', err);
+      Alert.alert('Order Failed', err.message || 'There was an error placing your order(s). Some may have been processed.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
-  const calculateItemTotal = (item: OrderItem) => {
-    const price = parseFloat(item.price.replace(/[^\d.]/g, ''));
-    return price * item.quantity;
-  };
-
-  const itemsTotal = dummyOrderItems.reduce((total, item) => total + calculateItemTotal(item), 0);
   const serviceFee = 5;
-  const grandTotal = itemsTotal + serviceFee;
+  const grandTotal = cartTotal + serviceFee;
+  
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#9a0f21" />
+          <Text style={styles.loadingText}>Loading Details...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (error) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.loadingContainer}>
+          <MaterialIcons name="error-outline" size={48} color="red" />
+          <Text style={styles.errorText}>{error}</Text>
+          <TouchableOpacity onPress={handleBackPress} style={styles.backButton}>
+             <Text style={styles.backButtonText}>Go Back</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={handleBackPress}>
+        <TouchableOpacity onPress={handleBackPress} disabled={isSubmitting}>
           <MaterialIcons name="arrow-back" size={24} color="#000" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Order Details</Text>
+        <Text style={styles.headerTitle}>Confirm Order</Text>
         <View style={{ width: 24 }} />
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Delivery Location */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Delivery Location</Text>
-          <TouchableOpacity
-            style={styles.dropdown}
-            onPress={() => setIsLocationDropdownOpen(!isLocationDropdownOpen)}
-          >
-            <Text style={[styles.dropdownText, !selectedLocation && styles.placeholderText]}>
-              {selectedLocation || 'Select delivery location'}
-            </Text>
-            <MaterialIcons 
-              name={isLocationDropdownOpen ? "expand-less" : "expand-more"} 
-              size={24} 
-              color="#666" 
-            />
-          </TouchableOpacity>
-
-          {isLocationDropdownOpen && (
-            <View style={styles.dropdownList}>
-              {deliveryLocations.map((location) => (
-                <TouchableOpacity
-                  key={location}
-                  style={styles.dropdownItem}
-                  onPress={() => {
-                    setSelectedLocation(location);
-                    setIsLocationDropdownOpen(false);
-                  }}
-                >
-                  <Text style={styles.dropdownItemText}>{location}</Text>
-                  {selectedLocation === location && (
-                    <MaterialIcons name="check" size={20} color="#9a0f21" />
-                  )}
-                </TouchableOpacity>
-              ))}
-            </View>
-          )}
-
-          {selectedLocation === 'Other (specify below)' && (
-            <TextInput
-              style={styles.textInput}
-              placeholder="Enter your specific location..."
-              value={customLocation}
-              onChangeText={setCustomLocation}
-              multiline
-            />
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Delivery Location</Text>
+            <TouchableOpacity 
+              style={styles.addButton}
+              onPress={() => router.push('/(app)/(protected)/food/add-address')}
+            >
+              <MaterialIcons name="add" size={16} color="#9a0f21" />
+              <Text style={styles.addButtonText}>Add New</Text>
+            </TouchableOpacity>
+          </View>
+          {allAddresses.map((address) => (
+            <TouchableOpacity
+              key={address.id}
+              style={[
+                styles.selectableOption,
+                selectedAddress?.id === address.id && styles.selectedOption
+              ]}
+              onPress={() => setSelectedAddress(address)}
+            >
+              <View style={styles.radioButton}>
+                {selectedAddress?.id === address.id && <View style={styles.radioButtonInner} />}
+              </View>
+              <View>
+                <Text style={styles.optionName}>{address.location}</Text>
+                {address.description && <Text style={styles.optionDescription}>{address.description}</Text>}
+              </View>
+            </TouchableOpacity>
+          ))}
+          {allAddresses.length === 0 && (
+            <Text style={styles.noItemsText}>No saved addresses found. Please add one.</Text>
           )}
         </View>
 
         {/* Payment Method */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Payment Method</Text>
-          
-          <TouchableOpacity
-            style={[styles.paymentOption, paymentMethod === 'Cash' && styles.selectedPaymentOption]}
-            onPress={() => setPaymentMethod('Cash')}
-          >
-            <View style={styles.radioButton}>
-              {paymentMethod === 'Cash' && <View style={styles.radioButtonInner} />}
-            </View>
-            <MaterialIcons name="money" size={24} color="#666" />
-            <Text style={styles.paymentOptionText}>Cash on Delivery</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.paymentOption, paymentMethod === 'Credit Card' && styles.selectedPaymentOption]}
-            onPress={() => setPaymentMethod('Credit Card')}
-          >
-            <View style={styles.radioButton}>
-              {paymentMethod === 'Credit Card' && <View style={styles.radioButtonInner} />}
-            </View>
-            <MaterialIcons name="credit-card" size={24} color="#666" />
-            <Text style={styles.paymentOptionText}>Credit Card</Text>
-          </TouchableOpacity>
+          {paymentMethods.map((method) => (
+             <TouchableOpacity
+              key={method.id}
+              style={[
+                styles.selectableOption,
+                selectedPaymentMethod?.id === method.id && styles.selectedOption
+              ]}
+              onPress={() => setSelectedPaymentMethod(method)}
+            >
+              <View style={styles.radioButton}>
+                {selectedPaymentMethod?.id === method.id && <View style={styles.radioButtonInner} />}
+              </View>
+              <MaterialIcons 
+                name={method.type === 'credit_card' ? 'credit-card' : 'money'} 
+                size={24} color="#666" 
+                style={{marginRight: 8}}
+              />
+              <Text style={styles.optionName}>{method.name}</Text>
+            </TouchableOpacity>
+          ))}
         </View>
 
         {/* Order Note */}
@@ -211,7 +360,7 @@ const OrderDetails = () => {
         <View style={styles.summarySection}>
           <Text style={styles.summaryTitle}>Order Summary</Text>
           
-          {dummyOrderItems.map((item) => (
+          {cart.map((item) => (
             <View key={item.id} style={styles.summaryItem}>
               <View style={styles.summaryItemInfo}>
                 <Text style={styles.summaryItemName}>
@@ -220,7 +369,7 @@ const OrderDetails = () => {
                 <Text style={styles.summaryItemRestaurant}>{item.restaurantName}</Text>
               </View>
               <Text style={styles.summaryItemPrice}>
-                {calculateItemTotal(item).toFixed(0)}₺
+                {(item.price * item.quantity).toFixed(2)}₺
               </Text>
             </View>
           ))}
@@ -229,12 +378,12 @@ const OrderDetails = () => {
 
           <View style={styles.summaryRow}>
             <Text style={styles.summaryLabel}>Items Total:</Text>
-            <Text style={styles.summaryValue}>{itemsTotal.toFixed(0)}₺</Text>
+            <Text style={styles.summaryValue}>{cartTotal.toFixed(2)}₺</Text>
           </View>
 
           <View style={styles.summaryRow}>
             <Text style={styles.summaryLabel}>Service Fee:</Text>
-            <Text style={styles.summaryValue}>{serviceFee}₺</Text>
+            <Text style={styles.summaryValue}>{serviceFee.toFixed(2)}₺</Text>
           </View>
 
           <View style={styles.summaryRow}>
@@ -244,19 +393,23 @@ const OrderDetails = () => {
 
           <View style={[styles.summaryRow, styles.totalRow]}>
             <Text style={styles.totalLabel}>Total:</Text>
-            <Text style={styles.totalValue}>{grandTotal.toFixed(0)}₺</Text>
+            <Text style={styles.totalValue}>{grandTotal.toFixed(2)}₺</Text>
           </View>
         </View>
-
-        {/* Bottom Spacing for Tab Navigation */}
         <View style={styles.bottomSpacing} />
       </ScrollView>
 
-      {/* Confirm Button */}
-      <View style={styles.buttonContainer}>
-        <TouchableOpacity style={styles.confirmButton} onPress={handleConfirmOrder}>
-          <MaterialIcons name="check-circle" size={24} color="#fff" />
-          <Text style={styles.confirmButtonText}>Confirm Order - {grandTotal.toFixed(0)}₺</Text>
+      <View style={styles.footer}>
+        <TouchableOpacity 
+          style={[styles.confirmButton, isSubmitting && styles.disabledButton]} 
+          onPress={handleConfirmOrder}
+          disabled={isSubmitting}
+        >
+          {isSubmitting ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <Text style={styles.confirmButtonText}>Place Order - {grandTotal.toFixed(2)}₺</Text>
+          )}
         </TouchableOpacity>
       </View>
     </SafeAreaView>
@@ -272,100 +425,68 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 15,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    borderBottomColor: '#e0e0e0',
   },
   headerTitle: {
     fontSize: 18,
     fontWeight: 'bold',
+    flex: 1,
+    textAlign: 'center',
   },
   content: {
     flex: 1,
-    padding: 16,
   },
   section: {
     backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 20,
-    marginBottom: 16,
+    padding: 16,
+    marginBottom: 12,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
   },
   sectionTitle: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 12,
   },
-  dropdown: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#e0e0e0',
-    borderRadius: 8,
-    padding: 12,
-    backgroundColor: '#f8f9fa',
-  },
-  dropdownText: {
-    fontSize: 14,
-    color: '#333',
-  },
-  placeholderText: {
-    color: '#999',
-  },
-  dropdownList: {
-    borderWidth: 1,
-    borderColor: '#e0e0e0',
-    borderRadius: 8,
-    backgroundColor: '#fff',
-    marginTop: 8,
-    maxHeight: 200,
-  },
-  dropdownItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
-  },
-  dropdownItemText: {
-    fontSize: 14,
-    color: '#333',
-  },
-  textInput: {
-    borderWidth: 1,
-    borderColor: '#e0e0e0',
-    borderRadius: 8,
-    padding: 12,
-    marginTop: 12,
-    fontSize: 14,
-    backgroundColor: '#f8f9fa',
-  },
-  paymentOption: {
+  addButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 16,
+    gap: 4,
+  },
+  addButtonText: {
+    color: '#9a0f21',
+    fontWeight: '600',
+    fontSize: 14,
+  },
+  selectableOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+    borderRadius: 8,
     borderWidth: 1,
     borderColor: '#e0e0e0',
-    borderRadius: 8,
-    marginBottom: 12,
-    backgroundColor: '#f8f9fa',
-    gap: 12,
+    marginBottom: 8,
   },
-  selectedPaymentOption: {
+  selectedOption: {
     borderColor: '#9a0f21',
-    backgroundColor: '#f0f8ff',
+    backgroundColor: '#fdebeb',
   },
   radioButton: {
     width: 20,
     height: 20,
     borderRadius: 10,
     borderWidth: 2,
-    borderColor: '#e0e0e0',
+    borderColor: '#9a0f21',
     justifyContent: 'center',
     alignItems: 'center',
+    marginRight: 12,
   },
   radioButtonInner: {
     width: 10,
@@ -373,10 +494,18 @@ const styles = StyleSheet.create({
     borderRadius: 5,
     backgroundColor: '#9a0f21',
   },
-  paymentOptionText: {
+  optionName: {
     fontSize: 14,
-    color: '#333',
-    flex: 1,
+    fontWeight: '500',
+  },
+  optionDescription: {
+    fontSize: 12,
+    color: '#666',
+  },
+  noItemsText: {
+    textAlign: 'center',
+    color: '#666',
+    paddingVertical: 16,
   },
   textAreaInput: {
     borderWidth: 1,
@@ -384,34 +513,29 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     padding: 12,
     fontSize: 14,
-    backgroundColor: '#f8f9fa',
     minHeight: 80,
   },
   summarySection: {
     backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 20,
-    marginBottom: 16,
+    padding: 16,
+    marginBottom: 12,
   },
   summaryTitle: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 16,
+    marginBottom: 12,
   },
   summaryItem: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 12,
+    marginBottom: 8,
   },
   summaryItemInfo: {
     flex: 1,
   },
   summaryItemName: {
     fontSize: 14,
-    color: '#333',
-    marginBottom: 2,
+    fontWeight: '500',
   },
   summaryItemRestaurant: {
     fontSize: 12,
@@ -419,8 +543,7 @@ const styles = StyleSheet.create({
   },
   summaryItemPrice: {
     fontSize: 14,
-    fontWeight: 'bold',
-    color: '#9a0f21',
+    fontWeight: '500',
   },
   summaryDivider: {
     height: 1,
@@ -430,8 +553,7 @@ const styles = StyleSheet.create({
   summaryRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 4,
   },
   summaryLabel: {
     fontSize: 14,
@@ -439,52 +561,76 @@ const styles = StyleSheet.create({
   },
   summaryValue: {
     fontSize: 14,
-    color: '#333',
+    fontWeight: '500',
   },
   freeText: {
     color: '#4CAF50',
-    fontWeight: '600',
+    fontWeight: 'bold',
   },
   totalRow: {
-    marginTop: 8,
     paddingTop: 12,
     borderTopWidth: 1,
     borderTopColor: '#e0e0e0',
-    marginBottom: 0,
   },
   totalLabel: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#333',
   },
   totalValue: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: 'bold',
     color: '#9a0f21',
   },
-  buttonContainer: {
+  footer: {
     padding: 16,
     backgroundColor: '#fff',
+    paddingBottom: 80,
     borderTopWidth: 1,
     borderTopColor: '#e0e0e0',
-    bottom: 65,
   },
   confirmButton: {
     backgroundColor: '#9a0f21',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
     paddingVertical: 16,
     borderRadius: 8,
-    gap: 8,
+    alignItems: 'center',
+  },
+  disabledButton: {
+    backgroundColor: '#ccc',
   },
   confirmButtonText: {
     color: '#fff',
     fontSize: 16,
     fontWeight: '600',
   },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 16,
+  },
+  loadingText: {
+    fontSize: 16,
+    color: '#666',
+  },
+  errorText: {
+    fontSize: 16,
+    color: 'red',
+    textAlign: 'center',
+    paddingHorizontal: 20,
+  },
+  backButton: {
+      marginTop: 20,
+      backgroundColor: '#9a0f21',
+      paddingHorizontal: 20,
+      paddingVertical: 10,
+      borderRadius: 8,
+  },
+  backButtonText: {
+    color: '#fff',
+    fontSize: 16,
+  },
   bottomSpacing: {
-    height: 100,
+    height: 20,
   },
 });
 
