@@ -104,7 +104,7 @@ const HomeScreen = () => {
         </View>
 
         {/* Quick Stats */}
-        <View style={styles.statsContainer}>
+        {/* <View style={styles.statsContainer}>
           <Text style={styles.statsTitle}>Quick Stats</Text>
           <View style={styles.statsGrid}>
             <View style={styles.statCard}>
@@ -123,7 +123,7 @@ const HomeScreen = () => {
               <Text style={styles.statLabel}>Transactions</Text>
             </View>
           </View>
-        </View>
+        </View> */}
 
         {/* Bottom Spacing for Tab Navigation */}
         <View style={styles.bottomSpacing} />

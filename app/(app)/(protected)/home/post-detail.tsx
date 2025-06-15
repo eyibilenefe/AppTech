@@ -1,7 +1,6 @@
 import { MaterialIcons } from '@expo/vector-icons';
 import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
-import * as Haptics from 'expo-haptics';
-import { useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -73,6 +72,7 @@ const PostDetailScreen = () => {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
   const searchParams = useLocalSearchParams();
+  const router = useRouter();
   
   // Handle both React Navigation (from social tab) and Expo Router (from other tabs) parameters
   let initialPost: PostWithVote;
@@ -88,6 +88,27 @@ const PostDetailScreen = () => {
   } else {
     // Coming from React Navigation (within social tab)
     initialPost = route.params?.post;
+  }
+  
+  // Early return if no post data
+  if (!initialPost) {
+    return (
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <SafeAreaView style={styles.container}>
+          <View style={styles.header}>
+            <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+              <MaterialIcons name="arrow-back" size={28} color="#333" />
+            </TouchableOpacity>
+            <Text style={styles.headerTitle}>Post</Text>
+            <View style={styles.headerActions} />
+          </View>
+          <View style={styles.errorContainer}>
+            <MaterialIcons name="error-outline" size={48} color="#999" />
+            <Text style={styles.errorText}>Post not found</Text>
+          </View>
+        </SafeAreaView>
+      </GestureHandlerRootView>
+    );
   }
   
   const { user: authUser } = useSupabase(); // Get current authenticated user
@@ -190,11 +211,12 @@ const PostDetailScreen = () => {
   );
 
   const handleGoBack = () => {
-    navigation.goBack();
+    router.back();
   };
 
   const handleWriteComment = () => {
-    navigation.navigate('WriteComment', { postId: post.id });
+    // For home tab, we'll show an alert since WriteComment navigation is social-specific
+    Alert.alert('Feature not available', 'Comment writing is available in the Social tab.');
   };
 
   const handleImagePress = (imageUri: string) => {
@@ -248,71 +270,63 @@ const PostDetailScreen = () => {
   const handleCommentVote = async (comment: CommentWithVote, voteType: 1 | -1) => {
     if (!authUser) return;
 
-    // Optimistic UI update
     const updateVoteInComments = (list: CommentWithVote[]): CommentWithVote[] => {
       return list.map(c => {
         if (c.id === comment.id) {
+          const originalVote = c.currentUserVote;
           let newLikeCount = c.like_count;
           let newDislikeCount = c.dislike_count;
           let newVote = voteType;
 
-          if (c.currentUserVote === voteType) {
+          if (originalVote === voteType) { // Undo vote
             newVote = null as any;
             if (voteType === 1) newLikeCount--; else newDislikeCount--;
-          } else if (c.currentUserVote) {
+          } else if (originalVote) { // Switch vote
             if (voteType === 1) { newLikeCount++; newDislikeCount--; }
             else { newLikeCount--; newDislikeCount++; }
-          } else {
+          } else { // New vote
             if (voteType === 1) newLikeCount++; else newDislikeCount++;
           }
+
           return { ...c, like_count: newLikeCount, dislike_count: newDislikeCount, currentUserVote: newVote };
         }
-        if (c.replies) {
-          return { ...c, replies: updateVoteInComments(c.replies as CommentWithVote[]) };
+        
+        // Also update nested replies
+        if (c.replies.length > 0) {
+          return { ...c, replies: updateVoteInComments(c.replies) };
         }
+        
         return c;
       });
     };
-    const originalComments = [...comments];
+
     setComments(updateVoteInComments(comments));
 
-    // Database update
     try {
-      if (comment.currentUserVote === voteType) {
+      const originalVote = comment.currentUserVote;
+      if (originalVote === voteType) {
         await supabase.from('comment_votes').delete().match({ comment_id: comment.id, user_id: authUser.id });
-      } else if (comment.currentUserVote) {
+      } else if (originalVote) {
         await supabase.from('comment_votes').update({ vote_type: voteType }).match({ comment_id: comment.id, user_id: authUser.id });
       } else {
         await supabase.from('comment_votes').insert({ comment_id: comment.id, user_id: authUser.id, vote_type: voteType });
       }
     } catch (error) {
       console.error('Error voting on comment:', error);
-      setComments(originalComments); // Revert on error
+      fetchComments(); // Refresh on error
     }
   };
 
   const handleReply = (commentId: string, username: string) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    navigation.navigate('WriteComment', { 
-      postId: post.id, 
-      replyTo: commentId,
-      replyToUsername: username 
-    });
-    // Close the swipeable after action
-    if (swipeableRefs.current[commentId]) {
-      swipeableRefs.current[commentId]?.close();
-    }
+    Alert.alert('Feature not available', 'Reply functionality is available in the Social tab.');
   };
 
   const handleDeletePost = async () => {
-    if (!authUser || post.user_id !== authUser.id) {
-      Alert.alert('Error', 'You do not have permission to delete this post.');
-      return;
-    }
+    if (!authUser || !post || post.user_id !== authUser.id) return;
 
     Alert.alert(
       'Delete Post',
-      'Are you sure you want to permanently delete this post? This action cannot be undone.',
+      'Are you sure you want to delete this post? This action cannot be undone.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -321,43 +335,31 @@ const PostDetailScreen = () => {
           onPress: async () => {
             setIsDeleting(true);
             try {
-              // If the post has an image, delete it from storage first.
-              if (post.image) {
-                // This assumes the bucket is 'posts'. Update if yours is different.
-                const bucketName = 'posts'; 
-                const urlParts = post.image.split('/');
-                const bucketIndex = urlParts.indexOf(bucketName);
-                if (bucketIndex > -1) {
-                  const filePath = urlParts.slice(bucketIndex + 1).join('/');
-                  const { error: storageError } = await supabase.storage.from(bucketName).remove([filePath]);
-                  if (storageError) {
-                    // Log the error but proceed to delete the post record
-                    console.error('Could not delete post image:', storageError.message);
-                  }
-                }
-              }
+              const { error } = await supabase
+                .from('user_posts')
+                .delete()
+                .eq('id', post.id);
 
-              // Delete the post record from the database
-              const { error } = await supabase.from('user_posts').delete().eq('id', post.id);
               if (error) throw error;
-              
-              Alert.alert('Success', 'Your post has been deleted.');
-              navigation.goBack();
 
-            } catch (error: any) {
+              Alert.alert('Success', 'Post deleted successfully', [
+                { text: 'OK', onPress: () => router.back() }
+              ]);
+            } catch (error) {
               console.error('Error deleting post:', error);
-              Alert.alert('Error', error.message || 'Failed to delete the post.');
+              Alert.alert('Error', 'Failed to delete post. Please try again.');
             } finally {
               setIsDeleting(false);
             }
-          },
-        },
+          }
+        }
       ]
     );
   };
 
   const handleDelete = async (commentId: string) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    if (!authUser) return;
+
     Alert.alert(
       'Delete Comment',
       'Are you sure you want to delete this comment?',
@@ -367,100 +369,76 @@ const PostDetailScreen = () => {
           text: 'Delete',
           style: 'destructive',
           onPress: async () => {
-            // Optimistically remove the comment from the UI
-            const removeComment = (comments: CommentWithVote[], id: string): CommentWithVote[] => {
-              return comments.filter(comment => {
-                if (comment.id === id) return false;
-                comment.replies = removeComment(comment.replies, id);
-                return true;
-              });
-            };
-            setComments(prev => removeComment([...prev], commentId));
+            try {
+              const { error } = await supabase
+                .from('user_comments')
+                .delete()
+                .eq('id', commentId);
 
-            // Close the swipeable
-            if (swipeableRefs.current[commentId]) {
-              swipeableRefs.current[commentId]?.close();
+              if (error) throw error;
+
+              const removeComment = (comments: CommentWithVote[], id: string): CommentWithVote[] => {
+                return comments.filter(comment => {
+                  if (comment.id === id) {
+                    return false;
+                  }
+                  if (comment.replies.length > 0) {
+                    comment.replies = removeComment(comment.replies, id);
+                  }
+                  return true;
+                });
+              };
+
+              setComments(prev => removeComment(prev, commentId));
+            } catch (error) {
+              console.error('Error deleting comment:', error);
+              Alert.alert('Error', 'Failed to delete comment.');
             }
-
-            // Perform the delete operation in the backend
-            const { error } = await supabase
-              .from('user_comments')
-              .delete()
-              .eq('id', commentId);
-
-            if (error) {
-              Alert.alert('Error', 'Failed to delete comment. Please try again.');
-              // If the delete fails, refresh the comments to revert the optimistic update
-              fetchComments(); 
-            }
-          },
-        },
+          }
+        }
       ]
     );
   };
 
   const toggleReplies = (commentId: string) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setExpandedReplies(prev => ({
       ...prev,
-      [commentId]: !prev[commentId],
+      [commentId]: !prev[commentId]
     }));
   };
 
-  const renderRightActions = (commentId: string, username: string) => {
-    return (
-      <View style={styles.rightSwipeContainer}>
-        <TouchableOpacity 
-          onPress={() => handleReply(commentId, username)} 
-          style={styles.replyAction}
-          activeOpacity={0.8}
-        >
-          <MaterialIcons name="reply" size={24} color="white" />
-          <Text style={styles.swipeActionText}>Reply</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  };
+  const renderRightActions = (commentId: string, username: string) => (
+    <View style={styles.rightSwipeContainer}>
+      <TouchableOpacity style={styles.replyAction} onPress={() => handleReply(commentId, username)}>
+        <MaterialIcons name="reply" size={20} color="white" />
+      </TouchableOpacity>
+    </View>
+  );
 
-  const renderLeftActions = (commentId: string, isOwn: boolean) => {
-    if (!isOwn) return null;
-    return (
-      <View style={styles.leftSwipeContainer}>
-        <TouchableOpacity 
-          onPress={() => handleDelete(commentId)} 
-          style={styles.deleteAction}
-          activeOpacity={0.8}
-        >
-          <MaterialIcons name="delete-outline" size={24} color="white" />
-          <Text style={styles.swipeActionText}>Delete</Text>
+  const renderLeftActions = (commentId: string, isOwn: boolean) => (
+    <View style={styles.leftSwipeContainer}>
+      {isOwn && (
+        <TouchableOpacity style={styles.deleteAction} onPress={() => handleDelete(commentId)}>
+          <MaterialIcons name="delete" size={20} color="white" />
         </TouchableOpacity>
-      </View>
-    );
-  };
+      )}
+    </View>
+  );
 
   const renderReplies = (replies: CommentWithVote[], parentId: string, level: number = 1) => {
-    if (!expandedReplies[parentId] || replies.length === 0) {
-      return null;
-    }
-    return (
-      <View style={{ marginLeft: 20 * level }}>
-        {replies.map((reply) => (
-          <CommentItem key={reply.id} comment={reply} level={level + 1} />
-        ))}
-      </View>
-    );
+    if (!expandedReplies[parentId] || replies.length === 0) return null;
+    
+    return replies.map(reply => (
+      <CommentItem key={reply.id} comment={reply} level={level} />
+    ));
   };
 
   const CommentItem = ({ comment, level = 0 }: { comment: CommentWithVote; level?: number }) => {
     const isOwn = comment.user_id === authUser?.id;
-    const navigation = useNavigation<any>();
 
     const handleProfilePress = () => {
-      // We assume `comment.users` has an `id` property from the query.
-      const userId = (comment.users as any)?.id;
-      if (userId) {
-        navigation.navigate('ProfileReview', { userId });
-      }
+      // For home tab, we'll show an alert since ProfileReview navigation is social-specific
+      Alert.alert('Feature not available', 'Profile viewing is available in the Social tab.');
     };
 
     return (
@@ -607,10 +585,7 @@ const PostDetailScreen = () => {
             <TouchableOpacity
               style={styles.postHeader}
               disabled={post.is_anonymous}
-              onPress={() =>
-                !post.is_anonymous &&
-                navigation.navigate('ProfileReview', { userId: (post.users as any)?.id })
-              }>
+              onPress={() => Alert.alert('Feature not available', 'Profile viewing is available in the Social tab.')}>
               {!post.is_anonymous && (
                 <Image 
                   source={{ uri: post.users?.pp || 'https://place-hold.it/300' }} 
@@ -649,6 +624,9 @@ const PostDetailScreen = () => {
                     ]}>
                       {(post.like_count || 0) - (post.dislike_count || 0)}
                     </Text>
+                    <Text style={styles.postVoteRate}>
+                      {formatVoteRate(post.like_count || 0, post.dislike_count || 0)}
+                    </Text>
                   </View>
                   
                   <TouchableOpacity 
@@ -662,16 +640,10 @@ const PostDetailScreen = () => {
                     />
                   </TouchableOpacity>
                 </View>
-                
-                {/* Vote Rate Display */}
-                <Text style={styles.postVoteRate}>
-                  {formatVoteRate(post.like_count || 0, post.dislike_count || 0)}
-                </Text>
               </View>
-              
               <TouchableOpacity style={styles.commentButton} onPress={handleWriteComment}>
-                <MaterialIcons name="comment" size={20} color="#666" />
-                <Text style={styles.commentCount}>{post.user_comments?.[0]?.count || 0}</Text>
+                <MaterialIcons name="mode-comment" size={20} color="#666" />
+                <Text style={styles.commentCount}>{post.user_comments?.[0]?.count || comments.length || 0}</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -680,25 +652,46 @@ const PostDetailScreen = () => {
           <View style={styles.commentsSection}>
             <Text style={styles.commentsTitle}>Comments</Text>
             {loading ? (
-              <ActivityIndicator size="large" color="#9a0f21" style={{ marginTop: 20 }}/>
+              <ActivityIndicator size="large" color="#9a0f21" style={{ marginVertical: 20 }} />
             ) : comments.length > 0 ? (
-              comments.map(comment => <CommentItem key={comment.id} comment={comment} />)
+              comments.map(comment => (
+                <CommentItem key={comment.id} comment={comment} />
+              ))
             ) : (
               <Text style={styles.noCommentsText}>No comments yet. Be the first to comment!</Text>
             )}
           </View>
         </ScrollView>
-        
-      </SafeAreaView>
 
-      {/* Image Preview Modal */}
-      <Modal
-        visible={imagePreviewVisible}
-        transparent={true}
-        animationType="fade"
-        onRequestClose={handleCloseImagePreview}>
-        <ZoomableImage imageUri={previewImageUri} onClose={handleCloseImagePreview} insets={insets} />
-      </Modal>
+        {/* Write Comment Button */}
+        <View style={styles.writeCommentContainer}>
+          <TouchableOpacity style={styles.writeCommentButton} onPress={handleWriteComment}>
+            <Text style={styles.writeCommentText}>Write a comment...</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Image Preview Modal */}
+        <Modal
+          visible={imagePreviewVisible}
+          transparent={true}
+          animationType="fade"
+          onRequestClose={handleCloseImagePreview}
+        >
+          <View style={styles.imagePreviewOverlay}>
+            <TouchableOpacity 
+              style={styles.imagePreviewClose}
+              onPress={handleCloseImagePreview}
+            >
+              <MaterialIcons name="close" size={30} color="#fff" />
+            </TouchableOpacity>
+            <ZoomableImage 
+              imageUri={previewImageUri}
+              onClose={handleCloseImagePreview}
+              insets={insets}
+            />
+          </View>
+        </Modal>
+      </SafeAreaView>
     </GestureHandlerRootView>
   );
 };
@@ -711,110 +704,135 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
     justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    backgroundColor: '#f5f5f5',
   },
   backButton: {
-    marginRight: 16,
-    flex: 0.2,
+    padding: 8,
+    marginLeft: -8,
   },
   headerTitle: {
     fontSize: 20,
-    fontWeight: '600',
-    color: '#333',
+    fontWeight: '700',
+    color: '#1a1a1a',
     textAlign: 'center',
     flex: 1,
+    letterSpacing: -0.5,
   },
   headerActions: {
-    flex: 0.2,
-    alignItems: 'flex-end',
+    flexDirection: 'row',
+    alignItems: 'center',
+    minWidth: 40,
+    justifyContent: 'flex-end',
   },
   moreButton: {
-    padding: 4,
+    padding: 8,
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  errorText: {
+    fontSize: 16,
+    color: '#999',
+    marginTop: 12,
   },
   scrollView: {
     flex: 1,
   },
   scrollContent: {
-    paddingBottom: 100, // Ensure space for the comment input
+    paddingBottom: 80,
   },
+  
+  // Post card design
   postCard: {
     backgroundColor: 'white',
-    margin: 16,
-    borderRadius: 12,
-    padding: 16,
+    marginHorizontal: 16,
+    marginTop: 16,
+    borderRadius: 16,
+    padding: 20,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.2,
-    shadowRadius: 2,
-    elevation: 2,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
   },
   postHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 16,
   },
   avatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 50,
+    height: 50,
+    borderRadius: 25,
     marginRight: 12,
+    borderWidth: 2,
+    borderColor: '#f0f0f0',
   },
   username: {
-    fontSize: 16,
+    fontSize: 17,
     fontWeight: '600',
+    color: '#1a1a1a',
+    marginBottom: 2,
   },
   timestamp: {
-    fontSize: 12,
-    color: '#666',
+    fontSize: 13,
+    color: '#8a8a8a',
+    fontWeight: '500',
   },
   postContent: {
     fontSize: 16,
-    lineHeight: 22,
-    color: '#333',
-    marginBottom: 12,
+    lineHeight: 24,
+    color: '#2c2c2c',
+    marginBottom: 16,
   },
   postImage: {
     width: '100%',
-    height: 200,
-    borderRadius: 8,
-    marginTop: 8,
-    marginBottom: 12,
+    height: 250,
+    borderRadius: 12,
+    marginBottom: 16,
+    backgroundColor: '#f5f5f5',
   },
+  
+  // Enhanced action bar
   actionBar: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingTop: 16,
     borderTopWidth: 1,
-    borderTopColor: '#eee',
+    borderTopColor: '#f0f0f0',
   },
-  
-  // Reddit-style voting UI
   votingContainerWrapper: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flex: 1,
+    alignItems: 'flex-start',
   },
   votingContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#ffffff',
-    borderRadius: 16,
-    paddingHorizontal: 4,
-    paddingVertical: 3,
+    backgroundColor: '#f8f9fa',
+    borderRadius: 25,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
     borderWidth: 1,
-    borderColor: '#e8e8e8',
+    borderColor: '#e9ecef',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
   },
   voteButton: {
-    padding: 4,
-    borderRadius: 12,
+    padding: 8,
+    borderRadius: 20,
     justifyContent: 'center',
     alignItems: 'center',
-    minWidth: 28,
-    minHeight: 28,
-    marginHorizontal: 1,
+    minWidth: 36,
+    minHeight: 36,
   },
   upvoteActive: {
     backgroundColor: '#9a0f21',
@@ -822,8 +840,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.3,
     shadowRadius: 4,
-    elevation: 4,
-    transform: [{ scale: 1.05 }],
+    elevation: 3,
   },
   downvoteActive: {
     backgroundColor: '#6366F1',
@@ -831,22 +848,21 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.3,
     shadowRadius: 4,
-    elevation: 4,
-    transform: [{ scale: 1.05 }],
+    elevation: 3,
   },
   voteCountContainer: {
-    paddingHorizontal: 8,
-    minWidth: 36,
     alignItems: 'center',
+    marginHorizontal: 12,
+    minWidth: 40,
   },
   voteCount: {
-    fontSize: 13,
+    fontSize: 16,
     fontWeight: '700',
-    color: '#1a1a1a',
+    color: '#666',
     textAlign: 'center',
   },
   positiveVote: {
-    color: '#FF4500',
+    color: '#9a0f21',
   },
   negativeVote: {
     color: '#6366F1',
@@ -1097,49 +1113,51 @@ const styles = StyleSheet.create({
   rightSwipeContainer: {
     justifyContent: 'center',
     alignItems: 'center',
-    width: 80,
-    backgroundColor: 'transparent',
+    width: 70,
+    backgroundColor: '#007AFF',
+    borderTopRightRadius: 16,
+    borderBottomRightRadius: 16,
+    marginVertical: 2,
   },
   leftSwipeContainer: {
     justifyContent: 'center',
     alignItems: 'center',
-    width: 80,
-    backgroundColor: 'transparent',
+    width: 70,
+    backgroundColor: '#FF3B30',
+    borderTopLeftRadius: 16,
+    borderBottomLeftRadius: 16,
+    marginVertical: 2,
   },
-  
-  // Action button styles
   replyAction: {
-    backgroundColor: '#007AFF',
+    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    width: 70,
-    height: '90%',
-    borderRadius: 12,
-    shadowColor: '#007AFF',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 4,
+    width: '100%',
   },
   deleteAction: {
-    backgroundColor: '#FF3B30',
+    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    width: 70,
-    height: '90%',
-    borderRadius: 12,
-    shadowColor: '#FF3B30',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 4,
+    width: '100%',
   },
-  swipeActionText: {
-    color: 'white',
-    fontSize: 12,
-    fontWeight: '600',
-    marginTop: 4,
-    textAlign: 'center',
+  
+  // Image preview
+  imagePreviewOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.9)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  imagePreviewClose: {
+    position: 'absolute',
+    top: 50,
+    right: 20,
+    zIndex: 1,
+    padding: 10,
+  },
+  imagePreviewContent: {
+    width: '90%',
+    height: '70%',
   },
 });
 

@@ -26,6 +26,7 @@
     "@react-navigation/stack": "^7.3.3",
     "@supabase/supabase-js": "^2.49.9-next.1",
     "@types/html-to-text": "^9.0.4",
+    "base64-arraybuffer": "^1.0.2",
     "base64-js": "^1.5.1",
     "cheerio": "^1.1.0",
     "class-variance-authority": "^0.7.1",

@@ -40,6 +40,8 @@ type SupabaseContextProps = {
 	signInWithMagicLink: (email: string) => Promise<void>;
 	signInWithUniversityApi: (email: string, password: string) => Promise<void>;
 	signOut: () => Promise<void>;
+	refreshProfile: () => Promise<void>;
+	updateProfile: (updates: Partial<UserProfile>) => Promise<void>;
 };
 
 type SupabaseProviderProps = {
@@ -56,6 +58,8 @@ export const SupabaseContext = createContext<SupabaseContextProps>({
 	signInWithMagicLink: async () => {},
 	signInWithUniversityApi: async () => {},
 	signOut: async () => {},
+	refreshProfile: async () => {},
+	updateProfile: async () => {},
 });
 
 export const useSupabase = () => useContext(SupabaseContext);
@@ -96,6 +100,56 @@ export const SupabaseProvider = ({ children }: SupabaseProviderProps) => {
 			},
 		});
 		if (error) {
+			throw error;
+		}
+	};
+
+	// Function to refresh profile data from database
+	const refreshProfile = async () => {
+		if (!user) return;
+		
+		try {
+			const { data: profileData, error } = await supabase
+				.from("users")
+				.select("*")
+				.eq("id", user.id)
+				.single();
+
+			if (error) {
+				console.error('Error refreshing profile:', error);
+				return;
+			}
+
+			setProfile(profileData as UserProfile | null);
+		} catch (error) {
+			console.error('Error refreshing profile:', error);
+		}
+	};
+
+	// Function to update profile data both in database and local state
+	const updateProfile = async (updates: Partial<UserProfile>) => {
+		if (!user) {
+			throw new Error('No authenticated user');
+		}
+
+		try {
+			const { data: updatedProfile, error } = await supabase
+				.from("users")
+				.update(updates)
+				.eq("id", user.id)
+				.select()
+				.single();
+
+			if (error) {
+				throw error;
+			}
+
+			// Update local state immediately for better UX
+			setProfile(updatedProfile as UserProfile);
+			
+			return updatedProfile;
+		} catch (error) {
+			console.error('Error updating profile:', error);
 			throw error;
 		}
 	};
@@ -195,15 +249,15 @@ export const SupabaseProvider = ({ children }: SupabaseProviderProps) => {
 				name: universityUserData.name,
 				st_id: universityUserData.student_id_no,
 				dept: universityUserData.department,
-				mail: universityUserData.email,
+				email: universityUserData.email,
 				tel_no: universityUserData.tel_no,
 			};
 
 			// Use upsert to either insert a new profile or update an existing one
-			// based on the 'mail' column, which should have a UNIQUE constraint.
+			// based on the 'email' column, which should have a UNIQUE constraint.
 			const { data: upsertedProfile, error: upsertError } = await supabase
 				.from("users")
-				.upsert(profileData, { onConflict: "mail" })
+				.upsert(profileData, { onConflict: "email" })
 				.select()
 				.single();
 
@@ -276,6 +330,33 @@ export const SupabaseProvider = ({ children }: SupabaseProviderProps) => {
 		};
 	}, []);
 
+	// Set up real-time subscription for profile updates
+	useEffect(() => {
+		if (!user) return;
+
+		const profileSubscription = supabase
+			.channel('profile-changes')
+			.on(
+				'postgres_changes',
+				{
+					event: 'UPDATE',
+					schema: 'public',
+					table: 'users',
+					filter: `id=eq.${user.id}`,
+				},
+				(payload) => {
+					console.log('Profile updated:', payload);
+					// Update local profile state with the new data
+					setProfile(payload.new as UserProfile);
+				}
+			)
+			.subscribe();
+
+		return () => {
+			profileSubscription.unsubscribe();
+		};
+	}, [user]);
+
 	useEffect(() => {
 		if (!initialized) return;
 
@@ -309,6 +390,8 @@ export const SupabaseProvider = ({ children }: SupabaseProviderProps) => {
 				signInWithMagicLink,
 				signInWithUniversityApi,
 				signOut,
+				refreshProfile,
+				updateProfile,
 			}}
 		>
 			{children}
