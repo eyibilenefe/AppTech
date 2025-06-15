@@ -30,11 +30,22 @@ type UserProfile = {
 	is_valid: boolean;
 };
 
+// NEW: Type representing a user coming from the custom /api/login endpoint
+type ApiUser = {
+	id: string;
+	name: string;
+	dept: string;
+	st_id: string;
+	mail: string;
+	authToken: string;
+};
+
 type SupabaseContextProps = {
 	user: User | null;
 	profile: UserProfile | null;
 	session: Session | null;
 	initialized?: boolean;
+	apiUser: ApiUser | null;
 	signUp: (email: string, password: string) => Promise<void>;
 	signInWithPassword: (email: string, password: string) => Promise<void>;
 	signInWithMagicLink: (email: string) => Promise<void>;
@@ -42,6 +53,8 @@ type SupabaseContextProps = {
 	signOut: () => Promise<void>;
 	refreshProfile: () => Promise<void>;
 	updateProfile: (updates: Partial<UserProfile>) => Promise<void>;
+	loginWithAPI: (mail: string, password: string) => Promise<void>;
+	logoutAPI: () => void;
 };
 
 type SupabaseProviderProps = {
@@ -53,6 +66,7 @@ export const SupabaseContext = createContext<SupabaseContextProps>({
 	profile: null,
 	session: null,
 	initialized: false,
+	apiUser: null,
 	signUp: async () => {},
 	signInWithPassword: async () => {},
 	signInWithMagicLink: async () => {},
@@ -60,6 +74,8 @@ export const SupabaseContext = createContext<SupabaseContextProps>({
 	signOut: async () => {},
 	refreshProfile: async () => {},
 	updateProfile: async () => {},
+	loginWithAPI: async () => {},
+	logoutAPI: () => {},
 });
 
 export const useSupabase = () => useContext(SupabaseContext);
@@ -71,6 +87,7 @@ export const SupabaseProvider = ({ children }: SupabaseProviderProps) => {
 	const [session, setSession] = useState<Session | null>(null);
 	const [initialized, setInitialized] = useState<boolean>(false);
 	const [profile, setProfile] = useState<UserProfile | null>(null);
+	const [apiUser, setApiUser] = useState<ApiUser | null>(null);
 
 	const signUp = async (email: string, password: string) => {
 		const { error } = await supabase.auth.signUp({
@@ -176,8 +193,20 @@ export const SupabaseProvider = ({ children }: SupabaseProviderProps) => {
 				throw new Error(errorData.message || `University API request failed with status ${apiResponse.status}`);
 			}
 
+			// The token is sent in a 'Set-Cookie' header. We extract it here.
+			const cookieHeader = apiResponse.headers.get("Set-Cookie");
+			let token: string | null = null;
+
+			if (cookieHeader) {
+				// This regex finds the value of the 'authToken' cookie.
+				const match = cookieHeader.match(/authToken=([^;]+)/);
+				if (match) {
+					token = match[1];
+				}
+			}
+
 			const data = await apiResponse.json();
-			const universityUserData : UniversityUserData = data.user;
+			const universityUserData: UniversityUserData = data.user;
 
 			// 2. Sign in or sign up user in Supabase
 			let authUser: User | null = null;
@@ -269,6 +298,22 @@ export const SupabaseProvider = ({ children }: SupabaseProviderProps) => {
 				setProfile(upsertedProfile as UserProfile);
 			}
 
+			// If a token is found in the cookie, set the API user state
+			if (token) {
+				setApiUser({
+					id: universityUserData.id,
+					name: universityUserData.name,
+					dept: universityUserData.department,
+					st_id: universityUserData.student_id_no,
+					mail: universityUserData.email,
+					authToken: token,
+				});
+			} else {
+				console.warn(
+					"Could not extract authToken from Set-Cookie header. The header might not be exposed to React Native's fetch."
+				);
+			}
+
 			// The onAuthStateChange listener in useEffect should also update user/session state
 			// and trigger navigation if needed.
 		} catch (error: any) {
@@ -280,6 +325,7 @@ export const SupabaseProvider = ({ children }: SupabaseProviderProps) => {
 
 	const signOut = async () => {
 		const { error } = await supabase.auth.signOut();
+		setApiUser(null); // Clear the API user on sign out
 		if (error) {
 			throw error;
 		}
@@ -385,6 +431,7 @@ export const SupabaseProvider = ({ children }: SupabaseProviderProps) => {
 				profile,
 				session,
 				initialized,
+				apiUser,
 				signUp,
 				signInWithPassword,
 				signInWithMagicLink,
@@ -392,6 +439,8 @@ export const SupabaseProvider = ({ children }: SupabaseProviderProps) => {
 				signOut,
 				refreshProfile,
 				updateProfile,
+				loginWithAPI: async () => {},
+				logoutAPI: () => {},
 			}}
 		>
 			{children}

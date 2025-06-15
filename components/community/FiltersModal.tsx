@@ -1,59 +1,37 @@
 import { MaterialIcons } from '@expo/vector-icons';
 import React, { useState } from 'react';
 import {
-    Modal,
-    SafeAreaView,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  Modal,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 
 interface Community {
   id: string;
   name: string;
   logo: string;
+  isFollowing: boolean;
 }
 
 interface FiltersModalProps {
   visible: boolean;
   onClose: () => void;
   onApply: (filters: FilterState) => void;
+  communities: Community[];
 }
 
 interface FilterState {
   followStatus: 'all' | 'following' | 'not_following';
   selectedCommunities: string[];
-  eventTypes: string[];
 }
 
-const communities: Community[] = [
-  { id: 'cs', name: 'Computer Science', logo: '💻' },
-  { id: 'engineering', name: 'Engineering', logo: '⚙️' },
-  { id: 'sports', name: 'Sports Club', logo: '⚽' },
-  { id: 'music', name: 'Music Society', logo: '🎵' },
-  { id: 'debate', name: 'Debate Club', logo: '🗣️' },
-  { id: 'art', name: 'Art Club', logo: '🎨' },
-  { id: 'science', name: 'Science Club', logo: '🔬' },
-  { id: 'literature', name: 'Literature Club', logo: '📚' },
-];
-
-const eventTypes: string[] = [
-  'Workshop',
-  'Competition',
-  'Concert',
-  'Exhibition',
-  'Seminar',
-  'Social',
-  'Sports',
-  'Academic',
-];
-
-const FiltersModal: React.FC<FiltersModalProps> = ({ visible, onClose, onApply }) => {
+const FiltersModal: React.FC<FiltersModalProps> = ({ visible, onClose, onApply, communities }) => {
   const [followStatus, setFollowStatus] = useState<'all' | 'following' | 'not_following'>('all');
   const [selectedCommunities, setSelectedCommunities] = useState<string[]>([]);
-  const [selectedEventTypes, setSelectedEventTypes] = useState<string[]>([]);
 
   const toggleCommunity = (communityId: string) => {
     setSelectedCommunities(prev => 
@@ -63,19 +41,10 @@ const FiltersModal: React.FC<FiltersModalProps> = ({ visible, onClose, onApply }
     );
   };
 
-  const toggleEventType = (eventType: string) => {
-    setSelectedEventTypes(prev => 
-      prev.includes(eventType)
-        ? prev.filter(type => type !== eventType)
-        : [...prev, eventType]
-    );
-  };
-
   const handleApply = () => {
     onApply({
       followStatus,
       selectedCommunities,
-      eventTypes: selectedEventTypes,
     });
     onClose();
   };
@@ -83,8 +52,19 @@ const FiltersModal: React.FC<FiltersModalProps> = ({ visible, onClose, onApply }
   const clearFilters = () => {
     setFollowStatus('all');
     setSelectedCommunities([]);
-    setSelectedEventTypes([]);
   };
+
+  // Filter communities based on follow status
+  const filteredCommunities = React.useMemo(() => {
+    switch (followStatus) {
+      case 'following':
+        return communities.filter(community => community.isFollowing);
+      case 'not_following':
+        return communities.filter(community => !community.isFollowing);
+      default:
+        return communities;
+    }
+  }, [communities, followStatus]);
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet">
@@ -147,7 +127,7 @@ const FiltersModal: React.FC<FiltersModalProps> = ({ visible, onClose, onApply }
               style={styles.communitiesScroll}
               contentContainerStyle={styles.communitiesScrollContent}
             >
-              {communities.map(community => (
+              {filteredCommunities.map(community => (
                 <TouchableOpacity
                   key={community.id}
                   style={[
@@ -160,7 +140,11 @@ const FiltersModal: React.FC<FiltersModalProps> = ({ visible, onClose, onApply }
                     styles.communityLogo,
                     selectedCommunities.includes(community.id) && styles.selectedCommunityLogo,
                   ]}>
-                    <Text style={styles.communityLogoText}>{community.logo}</Text>
+                    {community.logo.startsWith('http') ? (
+                      <Text style={styles.communityLogoText}>🏢</Text>
+                    ) : (
+                      <Text style={styles.communityLogoText}>{community.logo}</Text>
+                    )}
                   </View>
                   <Text style={styles.communityName} numberOfLines={2}>
                     {community.name}
@@ -173,36 +157,6 @@ const FiltersModal: React.FC<FiltersModalProps> = ({ visible, onClose, onApply }
                 </TouchableOpacity>
               ))}
             </ScrollView>
-          </View>
-
-          {/* Event Types Section */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Event Types</Text>
-            <Text style={styles.sectionSubtitle}>Choose event categories you're interested in</Text>
-            <View style={styles.eventTypesContainer}>
-              {eventTypes.map(eventType => (
-                <TouchableOpacity
-                  key={eventType}
-                  style={[
-                    styles.eventTypeTag,
-                    selectedEventTypes.includes(eventType) && styles.selectedEventType,
-                  ]}
-                  onPress={() => toggleEventType(eventType)}
-                >
-                  <Text
-                    style={[
-                      styles.eventTypeText,
-                      selectedEventTypes.includes(eventType) && styles.selectedEventTypeText,
-                    ]}
-                  >
-                    {eventType}
-                  </Text>
-                  {selectedEventTypes.includes(eventType) && (
-                    <MaterialIcons name="check" size={16} color="#fff" style={styles.eventTypeCheck} />
-                  )}
-                </TouchableOpacity>
-              ))}
-            </View>
           </View>
         </ScrollView>
 
@@ -349,34 +303,7 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: '#fff',
   },
-  eventTypesContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  eventTypeTag: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 20,
-    backgroundColor: '#f8f9fa',
-    minHeight: 40,
-  },
-  selectedEventType: {
-    backgroundColor: '#9a0f21',
-  },
-  eventTypeText: {
-    fontSize: 14,
-    color: '#666',
-    fontWeight: '500',
-  },
-  selectedEventTypeText: {
-    color: '#fff',
-  },
-  eventTypeCheck: {
-    marginLeft: 6,
-  },
+
   footer: {
     paddingHorizontal: 20,
     paddingVertical: 20,

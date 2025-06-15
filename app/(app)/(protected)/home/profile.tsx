@@ -86,7 +86,7 @@ const ProfileScreen = () => {
       const blob = await response.blob();
       const arrayBuffer = await new Response(blob).arrayBuffer();
       
-      const fileName = `${user.id}.jpg`;
+      const fileName = `${user.id}-${Date.now()}.jpg`;
       const filePath = `profile-pictures/${fileName}`;
 
       const { error: uploadError } = await supabase.storage

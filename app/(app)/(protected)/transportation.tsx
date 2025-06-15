@@ -286,13 +286,22 @@ const Transportation = () => {
           logWithTimestamp(`No bus location data returned for line ${busLine}.`);
           return [];
         }
-        return data.HatOtobusKonumlari.map((bus: any) => ({
+        const buses: Bus[] = data.HatOtobusKonumlari.map((bus: any) => ({
           id: bus.OtobusId,
           latitude: parseFloat(bus.KoorX.split(',').join('.')),
           longitude: parseFloat(bus.KoorY.split(',').join('.')),
           route: busLine,
           direction: parseInt(bus.Yon ?? '0', 10),
         }));
+
+        // The API can occasionally return duplicate entries for the same bus.
+        // We'll deduplicate by bus ID, keeping only the last entry found.
+        const busMap = new Map<string, Bus>();
+        for (const bus of buses) {
+          busMap.set(bus.id, bus);
+        }
+        
+        return Array.from(busMap.values());
       } catch (error) {
         logWithTimestamp(`Error fetching bus locations for ${busLine} (Attempt ${i + 1}): ${error}`);
         if (i < MAX_RETRIES - 1) {
@@ -515,9 +524,9 @@ const Transportation = () => {
         )}
 
         {/* Location Markers - Only show when zoomed in enough */}
-        {currentZoomLevel < 0.1 && filteredLocations.map((location) => (
+        {currentZoomLevel < 0.1 && filteredLocations.map((location, index) => (
           <Marker
-            key={`loc-${location.id}`}
+            key={`loc-${location.id}-${index}`}
             coordinate={{
               latitude: location.latitude,
               longitude: location.longitude,
@@ -538,9 +547,9 @@ const Transportation = () => {
         ))}
 
         {/* Bus Stop Markers */}
-        {currentZoomLevel < 0.02 && filteredBusStops.map((stop) => (
+        {currentZoomLevel < 0.02 && filteredBusStops.map((stop, index) => (
           <Marker
-            key={`stop-${stop.id}`}
+            key={`stop-${stop.id}-${index}`}
             coordinate={{
               latitude: stop.latitude,
               longitude: stop.longitude,
@@ -561,7 +570,7 @@ const Transportation = () => {
         {/* Bus Markers */}
         {busesToRender.map((bus) => (
           <Marker.Animated
-            key={bus.id}
+            key={`${bus.id}-${bus.route}`}
             coordinate={(busAnimatedRegions.current[bus.id] as any) ?? {
               latitude: bus.latitude,
               longitude: bus.longitude,

@@ -1,13 +1,18 @@
+import { useSupabase } from '@/context/supabase-provider';
+import { supabase } from '@/utils/supabase';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
-    SafeAreaView,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  Image,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 
 // Community data for lookup
@@ -23,6 +28,7 @@ const communitiesLookup: Record<string, { name: string; logo: string; color: str
 
 const EventDetailScreen = () => {
   const router = useRouter();
+  const { user } = useSupabase();
   const params = useLocalSearchParams<{
     id: string;
     name: string;
@@ -32,59 +38,204 @@ const EventDetailScreen = () => {
     thumbnail: string;
     community: string;
     communityId: string;
+    communityLogo: string;
   }>();
 
   const {
     id,
     name,
     date,
-    location,
     description,
     thumbnail,
     community,
     communityId,
+    communityLogo,
   } = params;
+
+  // State for event registration
+  const [isRegistered, setIsRegistered] = useState(false);
+  const [attendeeCount, setAttendeeCount] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [registrationLoading, setRegistrationLoading] = useState(false);
 
   const communityData = communitiesLookup[communityId] || {
     name: community,
-    logo: '🏫',
+    logo: communityLogo,
     color: '#607d8b',
   };
 
+  // Check if user is registered for the event
+  const checkRegistration = async (eventId: string): Promise<boolean> => {
+    if (!user || !eventId) return false;
+    
+    try {
+      const { count, error } = await supabase
+        .from('attenders')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', user.id)
+        .eq('event_id', eventId);
+
+      if (error) {
+        console.error('Error checking registration:', error);
+        return false;
+      }
+
+      return (count || 0) > 0;
+    } catch (error) {
+      console.error('Error checking registration:', error);
+      return false;
+    }
+  };
+
+  // Get attendee count for the event
+  const getAttendeeCount = async (eventId: string): Promise<number> => {
+    if (!eventId) return 0;
+    
+    try {
+      const { count, error } = await supabase
+        .from('attenders')
+        .select('*', { count: 'exact', head: true })
+        .eq('event_id', eventId);
+
+      if (error) {
+        console.error('Error getting attendee count:', error);
+        return 0;
+      }
+
+      return count || 0;
+    } catch (error) {
+      console.error('Error getting attendee count:', error);
+      return 0;
+    }
+  };
+
+  // Join event
+  const joinEvent = async (eventId: string): Promise<boolean> => {
+    if (!user) {
+      Alert.alert('Error', 'You must be logged in to join an event.');
+      return false;
+    }
+
+    if (!eventId) {
+      Alert.alert('Error', 'Event ID is required.');
+      return false;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('attenders')
+        .insert({
+          user_id: user.id,
+          event_id: eventId,
+        });
+
+      if (error) {
+        console.error('Error joining event:', error);
+        Alert.alert('Error', 'Failed to join event. Please try again.');
+        return false;
+      }
+
+      Alert.alert('Success', 'You have successfully joined the event!');
+      return true;
+    } catch (error) {
+      console.error('Error joining event:', error);
+      Alert.alert('Error', 'Failed to join event. Please try again.');
+      return false;
+    }
+  };
+
+  // Leave event
+  const leaveEvent = async (eventId: string): Promise<boolean> => {
+    if (!user || !eventId) return false;
+
+    try {
+      const { error } = await supabase
+        .from('attenders')
+        .delete()
+        .eq('user_id', user.id)
+        .eq('event_id', eventId);
+
+      if (error) {
+        console.error('Error leaving event:', error);
+        Alert.alert('Error', 'Failed to leave event. Please try again.');
+        return false;
+      }
+
+      Alert.alert('Success', 'You have left the event.');
+      return true;
+    } catch (error) {
+      console.error('Error leaving event:', error);
+      Alert.alert('Error', 'Failed to leave event. Please try again.');
+      return false;
+    }
+  };
+
+  // Handle join/leave event
+  const handleEventRegistration = async () => {
+    if (!id) return;
+
+    setRegistrationLoading(true);
+    const currentStatus = isRegistered;
+    
+    // Optimistically update UI
+    setIsRegistered(!currentStatus);
+    setAttendeeCount(prev => currentStatus ? prev - 1 : prev + 1);
+
+    let success = false;
+    if (currentStatus) {
+      // Leave event
+      success = await leaveEvent(id);
+    } else {
+      // Join event
+      success = await joinEvent(id);
+    }
+
+    if (!success) {
+      // Revert optimistic update if operation failed
+      setIsRegistered(currentStatus);
+      setAttendeeCount(prev => currentStatus ? prev + 1 : prev - 1);
+    }
+
+    setRegistrationLoading(false);
+  };
+
+  // Fetch registration status and attendee count
+  const fetchEventData = async () => {
+    if (!id) {
+      setLoading(false);
+      return;
+    }
+
+    try {
+      setLoading(true);
+      
+      const [registrationStatus, count] = await Promise.all([
+        checkRegistration(id),
+        getAttendeeCount(id),
+      ]);
+
+      setIsRegistered(registrationStatus);
+      setAttendeeCount(count);
+    } catch (error) {
+      console.error('Error fetching event data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Fetch data when component mounts
+  useEffect(() => {
+    fetchEventData();
+  }, [id]);
+
   const handleBack = () => {
     router.back();
-  };
-
-  const handleJoin = () => {
-    // Handle join event logic
-    console.log('Joining event:', name);
-    // In a real app, this would make an API call
-  };
-
-  const handleAddToCalendar = () => {
-    // Handle add to calendar logic
-    console.log('Adding to calendar:', name);
   };
 
   const handleShare = () => {
     // Handle share logic
     console.log('Sharing event:', name);
   };
-
-  // Generate some sample tags based on the event
-  const generateTags = () => {
-    const tags = [];
-    if (communityId === 'cs') tags.push('Technology', 'Programming', 'Learning');
-    else if (communityId === 'sports') tags.push('Sports', 'Competition', 'Team');
-    else if (communityId === 'music') tags.push('Music', 'Performance', 'Arts');
-    else if (communityId === 'art') tags.push('Art', 'Creative', 'Exhibition');
-    else if (communityId === 'debate') tags.push('Debate', 'Speaking', 'Competition');
-    else tags.push('Event', 'University', 'Community');
-    
-    return tags;
-  };
-
-  const eventTags = generateTags();
 
   if (!name) {
     return (
@@ -124,21 +275,20 @@ const EventDetailScreen = () => {
           </View>
           
           {/* Community Info Badge */}
-          <View style={styles.communityBadge}>
-            <Text style={styles.communityLogo}>{communityData.logo}</Text>
+          <TouchableOpacity 
+            style={styles.communityBadge}
+            onPress={() => router.push({
+              pathname: '/(app)/(protected)/community/[id]',
+              params: { id: communityId }
+            })}
+          >
+            {communityData.logo.startsWith('http') ? (
+              <Image source={{ uri: communityData.logo }} style={styles.communityLogoDetail} />
+            ) : (
+              <Text style={styles.communityIconInDetail}>{communityData.logo}</Text>
+            )}
             <Text style={styles.communityName}>{communityData.name}</Text>
-          </View>
-        </View>
-
-        {/* Event Tags */}
-        <View style={styles.tagsContainer}>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-            {eventTags.map((tag, index) => (
-              <View key={index} style={styles.tag}>
-                <Text style={styles.tagText}>{tag}</Text>
-              </View>
-            ))}
-          </ScrollView>
+          </TouchableOpacity>
         </View>
 
         {/* Event Details */}
@@ -152,23 +302,50 @@ const EventDetailScreen = () => {
             </View>
           </View>
 
-          {/* Location */}
-          <View style={styles.detailRow}>
-            <MaterialIcons name="location-on" size={24} color="#666" />
-            <View style={styles.detailText}>
-              <Text style={styles.detailLabel}>Location</Text>
-              <Text style={styles.detailValue}>{location}</Text>
-            </View>
-          </View>
-
           {/* Community */}
-          <View style={styles.detailRow}>
-            <Text style={styles.communityIconInDetail}>{communityData.logo}</Text>
+          <TouchableOpacity style={styles.detailRow} onPress={() => router.push({
+            pathname: '/(app)/(protected)/community/[id]',
+            params: { id: communityId }
+          })}>
+            {communityData.logo.startsWith('http') ? (
+              <Image source={{ uri: communityData.logo }} style={styles.communityLogoDetail} />
+            ) : (
+              <Text style={styles.communityIconInDetail}>{communityData.logo}</Text>
+            )}
             <View style={styles.detailText}>
               <Text style={styles.detailLabel}>Organized by</Text>
               <Text style={styles.detailValue}>{communityData.name}</Text>
             </View>
-          </View>
+          </TouchableOpacity>
+
+          {/* Attendee Count */}
+          {loading ? (
+            <View style={styles.detailRow}>
+              <MaterialIcons name="people" size={24} color="#666" />
+              <View style={styles.detailText}>
+                <Text style={styles.detailLabel}>Attendees</Text>
+                <ActivityIndicator size="small" color="#666" />
+              </View>
+            </View>
+          ) : (
+            <TouchableOpacity 
+              style={styles.detailRow} 
+              onPress={() => router.push({
+                pathname: '/community/eventAttendees',
+                params: {
+                  eventId: id,
+                  eventName: name,
+                }
+              })}
+            >
+              <MaterialIcons name="people" size={24} color="#666" />
+              <View style={styles.detailText}>
+                <Text style={styles.detailLabel}>Attendees</Text>
+                <Text style={styles.detailValue}>{attendeeCount} registered</Text>
+              </View>
+              <MaterialIcons name="chevron-right" size={20} color="#ccc" />
+            </TouchableOpacity>
+          )}
         </View>
 
         {/* Description */}
@@ -179,14 +356,29 @@ const EventDetailScreen = () => {
 
         {/* Action Buttons */}
         <View style={styles.actionsContainer}>
-          <TouchableOpacity style={styles.joinButton} onPress={handleJoin}>
-            <MaterialIcons name="person-add" size={20} color="#fff" />
-            <Text style={styles.joinButtonText}>Join Event</Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity style={styles.calendarButton} onPress={handleAddToCalendar}>
-            <MaterialIcons name="calendar-today" size={20} color="#9a0f21" />
-            <Text style={styles.calendarButtonText}>Add to Calendar</Text>
+          <TouchableOpacity 
+            style={[
+              styles.joinButton, 
+              isRegistered && styles.leaveButton,
+              registrationLoading && styles.disabledButton
+            ]} 
+            onPress={handleEventRegistration}
+            disabled={registrationLoading}
+          >
+            {registrationLoading ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : (
+              <>
+                <MaterialIcons 
+                  name={isRegistered ? "person-remove" : "person-add"} 
+                  size={20} 
+                  color="#fff" 
+                />
+                <Text style={styles.joinButtonText}>
+                  {isRegistered ? "Leave Event" : "Join Event"}
+                </Text>
+              </>
+            )}
           </TouchableOpacity>
         </View>
 
@@ -272,6 +464,7 @@ const styles = StyleSheet.create({
     bottom: 16,
     right: 16,
     flexDirection: 'row',
+    gap: 8,
     alignItems: 'center',
     backgroundColor: 'rgba(255, 255, 255, 0.9)',
     paddingHorizontal: 12,
@@ -331,6 +524,12 @@ const styles = StyleSheet.create({
   communityIconInDetail: {
     fontSize: 24,
   },
+  communityLogoDetail: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    marginRight: 2,
+  },
   descriptionContainer: {
     paddingHorizontal: 20,
     paddingVertical: 16,
@@ -370,6 +569,12 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginLeft: 8,
   },
+  leaveButton: {
+    backgroundColor: '#f44336',
+  },
+  disabledButton: {
+    backgroundColor: '#ccc',
+  },
   calendarButton: {
     backgroundColor: '#fff',
     flexDirection: 'row',
@@ -388,7 +593,8 @@ const styles = StyleSheet.create({
   },
   guidelinesContainer: {
     paddingHorizontal: 20,
-    paddingVertical: 16,
+    paddingTop: 16,
+    paddingBottom: 100,
     backgroundColor: '#f8f9fa',
     marginTop: 16,
     marginBottom: 40,

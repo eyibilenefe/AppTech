@@ -10,11 +10,10 @@ import {
   SafeAreaView,
   ScrollView,
   StyleSheet,
-  Switch,
   Text,
   TextInput,
   TouchableOpacity,
-  View,
+  View
 } from 'react-native';
 
 import { useSupabase } from '@/context/supabase-provider';
@@ -27,8 +26,6 @@ const WriteCommentScreen = () => {
   const { user, profile } = useSupabase();
 
   const [commentText, setCommentText] = useState('');
-  const [tagText, setTagText] = useState('');
-  const [isAnonymous, setIsAnonymous] = useState(false);
   const [image, setImage] = useState<ImagePicker.ImagePickerAsset | null>(null);
   const [isUploading, setIsUploading] = useState(false);
 
@@ -72,7 +69,7 @@ const WriteCommentScreen = () => {
         const filePath = `comment-images/${fileName}`;
         
         const { error: uploadError } = await supabase.storage
-          .from('posts') // Assuming 'posts' bucket is used for comment images too
+          .from('posts')
           .upload(filePath, toByteArray(image.base64), {
             contentType: `image/${fileExt}`,
           });
@@ -89,7 +86,7 @@ const WriteCommentScreen = () => {
       const { error: insertError } = await supabase.from('user_comments').insert({
         context: commentText,
         image: imageUrl,
-        user_id: isAnonymous ? null : profile.id,
+        user_id: profile.id,
         user_posts_id: postId,
         parent_id: replyTo || null,
         comment_date: new Date().toISOString(),
@@ -158,22 +155,7 @@ const WriteCommentScreen = () => {
             source={{ uri: profile?.pp || 'https://via.placeholder.com/48' }} 
             style={styles.userAvatar} 
           />
-          <View style={styles.userInfo}>
-            <View style={styles.anonymousToggle}>
-              <Text style={styles.usernameText}>
-                {isAnonymous ? 'Anonymous' : profile?.name || 'User'}
-              </Text>
-              <View style={styles.toggleContainer}>
-                <Text style={styles.toggleLabel}>Anonymous</Text>
-                <Switch
-                  value={isAnonymous}
-                  onValueChange={setIsAnonymous}
-                  trackColor={{ false: '#d3d3d3', true: '#9a0f21' }}
-                  thumbColor={isAnonymous ? '#ffffff' : '#f4f3f4'}
-                />
-              </View>
-            </View>
-          </View>
+          <Text style={styles.usernameText}>{profile?.name}</Text>
         </View>
 
         {/* Comment Text Input */}
@@ -305,6 +287,7 @@ const styles = StyleSheet.create({
   userSection: {
     flexDirection: 'row',
     backgroundColor: 'white',
+    alignItems: 'center',
     padding: 16,
     marginTop: 8,
     borderBottomWidth: 1,

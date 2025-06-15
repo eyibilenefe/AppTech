@@ -1,6 +1,7 @@
 import { MaterialIcons } from '@expo/vector-icons';
 import React, { useMemo, useState } from 'react';
 import {
+    Image,
     SafeAreaView,
     SectionList,
     StyleSheet,
@@ -19,7 +20,15 @@ interface Community {
   isFollowing: boolean;
 }
 
-const communities: Community[] = [
+interface CommunitiesListProps {
+  communities?: Community[]; // Make communities optional with default fallback
+  onCommunityPress?: (community: Community) => void;
+  onBack?: () => void;
+  showBackButton?: boolean;
+}
+
+// Default mock communities as fallback
+const defaultCommunities: Community[] = [
   {
     id: 'art',
     name: 'Art Club',
@@ -44,71 +53,10 @@ const communities: Community[] = [
     memberCount: 234,
     isFollowing: true,
   },
-  {
-    id: 'debate',
-    name: 'Debate Society',
-    logo: '🗣️',
-    description: 'Improve public speaking and critical thinking',
-    memberCount: 67,
-    isFollowing: false,
-  },
-  {
-    id: 'engineering',
-    name: 'Engineering Society',
-    logo: '⚙️',
-    description: 'Innovation and engineering excellence',
-    memberCount: 178,
-    isFollowing: false,
-  },
-  {
-    id: 'film',
-    name: 'Film Society',
-    logo: '🎬',
-    description: 'Movie appreciation and filmmaking',
-    memberCount: 92,
-    isFollowing: false,
-  },
-  {
-    id: 'literature',
-    name: 'Literature Club',
-    logo: '📚',
-    description: 'Book discussions and creative writing',
-    memberCount: 145,
-    isFollowing: false,
-  },
-  {
-    id: 'music',
-    name: 'Music Society',
-    logo: '🎵',
-    description: 'Musical performances and appreciation',
-    memberCount: 201,
-    isFollowing: true,
-  },
-  {
-    id: 'photography',
-    name: 'Photography Club',
-    logo: '📸',
-    description: 'Capture and share beautiful moments',
-    memberCount: 123,
-    isFollowing: false,
-  },
-  {
-    id: 'science',
-    name: 'Science Club',
-    logo: '🔬',
-    description: 'Scientific research and experiments',
-    memberCount: 167,
-    isFollowing: false,
-  },
 ];
 
-interface CommunitiesListProps {
-  onCommunityPress?: (community: Community) => void;
-  onBack?: () => void;
-  showBackButton?: boolean;
-}
-
 const CommunitiesList: React.FC<CommunitiesListProps> = ({ 
+  communities = defaultCommunities, // Use provided communities or default to mock
   onCommunityPress, 
   onBack,
   showBackButton = true 
@@ -140,13 +88,13 @@ const CommunitiesList: React.FC<CommunitiesListProps> = ({
         title: letter,
         data: grouped[letter].sort((a, b) => a.name.localeCompare(b.name)),
       }));
-  }, [searchQuery]);
+  }, [searchQuery, communities]);
 
   // Generate alphabet index
   const alphabetIndex = useMemo(() => {
     const letters = new Set(communities.map(c => c.name[0].toUpperCase()));
     return Array.from(letters).sort();
-  }, []);
+  }, [communities]);
 
   const scrollToSection = (letter: string) => {
     setSelectedLetter(letter);
@@ -160,7 +108,14 @@ const CommunitiesList: React.FC<CommunitiesListProps> = ({
       onPress={() => onCommunityPress?.(item)}
     >
       <View style={styles.communityLogo}>
-        <Text style={styles.communityLogoText}>{item.logo}</Text>
+        {item.logo.startsWith('http') ? (
+          <Image
+            source={{ uri: item.logo }}
+            style={styles.communityLogoImage}
+          />
+        ) : (
+          <Text style={styles.communityLogoText}>{item.logo}</Text>
+        )}
       </View>
       <View style={styles.communityInfo}>
         <View style={styles.communityHeader}>
@@ -348,6 +303,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 16,
+  },
+  communityLogoImage: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
   },
   communityLogoText: {
     fontSize: 24,

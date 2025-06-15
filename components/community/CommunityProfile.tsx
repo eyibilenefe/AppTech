@@ -1,12 +1,13 @@
 import { MaterialIcons } from '@expo/vector-icons';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
-    FlatList,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View
+  FlatList,
+  Image,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 
 interface Event {
@@ -22,17 +23,23 @@ interface Community {
   id: string;
   name: string;
   logo: string;
-  bannerColor: string;
   description: string;
   memberCount: number;
-  eventCount: number;
   isFollowing: boolean;
+  bannerColor: string;
+  eventCount: number;
+  aboutText: string;
+  contactInfo: {
+    email: string;
+    website: string;
+  };
 }
 
 interface CommunityProfileProps {
   community: Community;
   events?: Event[]; // Optional events prop
   onEventPress?: (event: Event) => void;
+  onMembershipToggle?: () => void; // Add membership toggle handler
 }
 
 const defaultMockEvents: Event[] = [
@@ -65,13 +72,19 @@ const defaultMockEvents: Event[] = [
 const CommunityProfile: React.FC<CommunityProfileProps> = ({ 
   community, 
   events = defaultMockEvents, // Use provided events or default to mock events
-  onEventPress 
+  onEventPress,
+  onMembershipToggle
 }) => {
   const [isFollowing, setIsFollowing] = useState(community.isFollowing);
 
+  // Update local state when community prop changes
+  useEffect(() => {
+    setIsFollowing(community.isFollowing);
+  }, [community.isFollowing]);
+
   const handleFollowPress = () => {
     setIsFollowing(!isFollowing);
-    // Here you would typically make an API call to follow/unfollow
+    onMembershipToggle?.();
   };
 
   const renderEventCard = ({ item }: { item: Event }) => (
@@ -103,7 +116,14 @@ const CommunityProfile: React.FC<CommunityProfileProps> = ({
         <View style={styles.communityInfo}>
           <View style={styles.logoContainer}>
             <View style={styles.communityLogo}>
-              <Text style={styles.communityLogoText}>{community.logo}</Text>
+              {community.logo.startsWith('http') ? (
+                <Image
+                  source={{ uri: community.logo }}
+                  style={styles.communityLogoImage}
+                />
+              ) : (
+                <Text style={styles.communityLogoText}>🛖</Text>
+              )}
             </View>
           </View>
           
@@ -147,7 +167,13 @@ const CommunityProfile: React.FC<CommunityProfileProps> = ({
         {/* Description */}
         <View style={styles.descriptionSection}>
           <Text style={styles.sectionTitle}>About</Text>
-          <Text style={styles.description}>{community.description}</Text>
+          <View className='flex-col justify-start gap-2'>
+            <Text style={styles.description}>{community.description}</Text>
+            <View style={styles.infoRow}>
+              <MaterialIcons name="email" size={20} color="#666" />
+              <Text style={styles.infoText}>{community.contactInfo.email}</Text>
+            </View>
+          </View>
         </View>
 
         {/* Upcoming Events */}
@@ -179,26 +205,7 @@ const CommunityProfile: React.FC<CommunityProfileProps> = ({
             </View>
           )}
         </View>
-
-        {/* Additional Info */}
-        <View style={styles.additionalInfo}>
-          <View style={styles.infoRow}>
-            <MaterialIcons name="location-on" size={20} color="#666" />
-            <Text style={styles.infoText}>Engineering Building, Room 205</Text>
-          </View>
-          <View style={styles.infoRow}>
-            <MaterialIcons name="schedule" size={20} color="#666" />
-            <Text style={styles.infoText}>Meetings: Every Wednesday 6:00 PM</Text>
-          </View>
-          <View style={styles.infoRow}>
-            <MaterialIcons name="email" size={20} color="#666" />
-            <Text style={styles.infoText}>contact@computerscience.edu</Text>
-          </View>
-          <View style={styles.infoRow}>
-            <MaterialIcons name="language" size={20} color="#666" />
-            <Text style={styles.infoText}>www.computerscience.edu</Text>
-          </View>
-        </View>
+        
       </ScrollView>
     </View>
   );
@@ -208,6 +215,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#fff',
+    paddingBottom: 100,
   },
   content: {
     flex: 1,
@@ -250,6 +258,12 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
+  },
+  communityLogoImage: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 40,
+    resizeMode: 'cover',
   },
   communityLogoText: {
     fontSize: 32,

@@ -1,14 +1,16 @@
+import { useSupabase } from '@/context/supabase-provider';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
-    Alert,
-    SafeAreaView,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View
 } from 'react-native';
 
 interface ReservationType {
@@ -19,13 +21,44 @@ interface ReservationType {
   description: string;
 }
 
+interface ApiReservation {
+  id: number;
+  name: string;
+}
+
+interface ApiResponse {
+  success: boolean;
+  count: number;
+  data: ApiReservation[];
+}
+
 const CafeteriaReservationScreen = () => {
   const router = useRouter();
+  const { apiUser } = useSupabase();
   const [selectedType, setSelectedType] = useState<string | null>(null);
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [apiReservations, setApiReservations] = useState<ApiReservation[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const reservationTypes: ReservationType[] = [
+  const timeSlots = [
+    '11:30 - 12:00',
+    '12:00 - 12:30',
+    '12:30 - 13:00',
+    '13:00 - 13:30',
+    '13:30 - 14:00',
+    '14:00 - 14:30'
+  ];
+
+  const dates = [
+    { label: 'Today', value: new Date().toISOString().split('T')[0] },
+    { label: 'Tomorrow', value: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().split('T')[0] },
+    { label: 'Day After', value: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] }
+  ];
+
+  // Default reservation types (fallback if API fails)
+  const defaultReservationTypes: ReservationType[] = [
     {
       id: 'vegetarian',
       name: 'Vegetarian Lunch',
@@ -56,48 +89,170 @@ const CafeteriaReservationScreen = () => {
     }
   ];
 
-  const timeSlots = [
-    '11:30 - 12:00',
-    '12:00 - 12:30',
-    '12:30 - 13:00',
-    '13:00 - 13:30',
-    '13:30 - 14:00',
-    '14:00 - 14:30'
-  ];
+  // Function to map API data to ReservationType format
+  const mapApiDataToReservationType = (apiData: ApiReservation[]): ReservationType[] => {
+    const iconMap: { [key: string]: string } = {
+      'vegan': 'grass',
+      'vegetarian': 'eco',
+      'lunch': 'restaurant',
+      'regular': 'restaurant',
+      'iftar': 'star',
+      'special': 'star',
+      'breakfast': 'free-breakfast',
+      'dinner': 'dinner-dining',
+    };
 
-  const dates = [
-    { label: 'Today', value: new Date().toISOString().split('T')[0] },
-    { label: 'Tomorrow', value: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().split('T')[0] },
-    { label: 'Day After', value: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] }
-  ];
+    const priceMap: { [key: string]: string } = {
+      'vegan': '15₺',
+      'vegetarian': '12₺',
+      'lunch': '18₺',
+      'regular': '18₺',
+      'iftar': '25₺',
+      'special': '25₺',
+      'breakfast': '10₺',
+      'dinner': '22₺',
+    };
+
+    const descriptionMap: { [key: string]: string } = {
+      'vegan': 'Plant-based meals with no animal products',
+      'vegetarian': 'Fresh salads, grilled vegetables, and veggie protein',
+      'lunch': 'Traditional Turkish cuisine with meat and vegetables',
+      'regular': 'Traditional Turkish cuisine with meat and vegetables',
+      'iftar': 'Special iftar menu with traditional dishes',
+      'special': 'Chef\'s special with premium ingredients',
+      'breakfast': 'Traditional Turkish breakfast',
+      'dinner': 'Evening meal with variety of options',
+    };
+
+    return apiData.map(item => ({
+      id: item.id.toString(),
+      name: item.name.charAt(0).toUpperCase() + item.name.slice(1),
+      icon: iconMap[item.name.toLowerCase()] || 'restaurant',
+      price: priceMap[item.name.toLowerCase()] || '15₺',
+      description: descriptionMap[item.name.toLowerCase()] || 'Delicious meal option'
+    }));
+  };
+
+  // Get current reservation types (API data or fallback)
+  const getCurrentReservationTypes = (): ReservationType[] => {
+    if (loading) return [];
+    if (error || apiReservations.length === 0) return defaultReservationTypes;
+    return mapApiDataToReservationType(apiReservations);
+  };
 
   const handleBackPress = () => {
     router.back();
   };
 
-  const handleCompleteReservation = () => {
+  const handleCompleteReservation = async () => {
     if (!selectedType || !selectedTime || !selectedDate) {
       Alert.alert('Error', 'Please select meal type, time, and date');
       return;
     }
 
-    const selectedTypeData = reservationTypes.find(type => type.id === selectedType);
-    
+    const currentTypes = getCurrentReservationTypes();
+    const selectedTypeData = currentTypes.find(type => type.id === selectedType);
+
+    // Ask user confirmation before sending request
     Alert.alert(
       'Confirm Reservation',
       `Meal: ${selectedTypeData?.name}\nTime: ${selectedTime}\nDate: ${dates.find(d => d.value === selectedDate)?.label}\nPrice: ${selectedTypeData?.price}`,
       [
         { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Confirm', 
-          onPress: () => {
-            Alert.alert('Success', 'Reservation completed successfully!');
-            router.back();
-          }
+        {
+          text: 'Confirm',
+          onPress: async () => {
+            try {
+              setLoading(true);
+
+              const url = process.env.EXPO_PUBLIC_UNIVERSITY_API_ENDPOINT + '/api/cafeteria-reservations';
+
+              const body = {
+                reservation_date: selectedDate,
+                meal_type_id: parseInt(selectedType, 10),
+              };
+
+              const response = await fetch(url, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  "Cookie": `authToken=${apiUser?.authToken}`,
+                },
+                credentials: 'include', // send authToken cookie
+                body: JSON.stringify(body),
+              });
+              if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(errorData.message || `Request failed with status ${response.status}`);
+              }
+
+              const result = await response.json();
+
+              if (result.success) {
+                Alert.alert('Success', 'Reservation completed successfully!', [
+                  {
+                    text: 'OK',
+                    onPress: () => router.back(),
+                  },
+                ]);
+              } else {
+                throw new Error('Server returned success: false');
+              }
+            } catch (err) {
+              const errorMsg = err instanceof Error ? err.message : 'Failed to create reservation';
+              console.error('Reservation error:', err);
+              Alert.alert('Error', errorMsg);
+            } finally {
+              setLoading(false);
+            }
+          },
         },
       ]
     );
   };
+
+  // API function to fetch cafeteria reservations
+  const fetchCafeteriaReservations = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      const url = process.env.EXPO_PUBLIC_UNIVERSITY_API_ENDPOINT + '/api/cafeteria-meal-types';
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const result: ApiResponse = await response.json();
+      
+      if (result.success) {
+        setApiReservations(result.data);
+        console.log('Fetched reservations:', result.data);
+      } else {
+        throw new Error('API returned success: false');
+      }
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to fetch reservations';
+      setError(errorMessage);
+      console.error('Error fetching reservations:', err);
+      
+      // Optionally show an alert to the user
+      Alert.alert('Error', `Failed to load reservations: ${errorMessage}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Fetch reservations when component mounts
+  useEffect(() => {
+    fetchCafeteriaReservations();
+  }, []);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -124,8 +279,26 @@ const CafeteriaReservationScreen = () => {
         {/* Meal Types */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Select Meal Type</Text>
+          {loading ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color="#9a0f21" />
+              <Text style={styles.loadingText}>Loading meal types...</Text>
+            </View>
+          ) : error ? (
+            <View style={styles.errorContainer}>
+              <MaterialIcons name="error" size={24} color="#ff4444" />
+              <Text style={styles.errorText}>Failed to load meal types. Using default options.</Text>
+              <TouchableOpacity 
+                style={styles.retryButton} 
+                onPress={fetchCafeteriaReservations}
+              >
+                <Text style={styles.retryButtonText}>Retry</Text>
+              </TouchableOpacity>
+            </View>
+          ) : null}
+          
           <View style={styles.typeGrid}>
-            {reservationTypes.map((type) => (
+            {getCurrentReservationTypes().map((type) => (
               <TouchableOpacity
                 key={type.id}
                 style={[
@@ -222,7 +395,7 @@ const CafeteriaReservationScreen = () => {
               <View style={styles.summaryRow}>
                 <Text style={styles.summaryLabel}>Meal Type</Text>
                 <Text style={styles.summaryValue}>
-                  {reservationTypes.find(type => type.id === selectedType)?.name}
+                  {getCurrentReservationTypes().find(type => type.id === selectedType)?.name}
                 </Text>
               </View>
               <View style={styles.summaryRow}>
@@ -239,7 +412,7 @@ const CafeteriaReservationScreen = () => {
               <View style={styles.summaryRow}>
                 <Text style={styles.summaryLabelTotal}>Total Price</Text>
                 <Text style={styles.summaryValueTotal}>
-                  {reservationTypes.find(type => type.id === selectedType)?.price}
+                  {getCurrentReservationTypes().find(type => type.id === selectedType)?.price}
                 </Text>
               </View>
             </View>
@@ -506,6 +679,82 @@ const styles = StyleSheet.create({
   },
   bottomSpacing: {
     height: 100,
+  },
+  // API Reservations Styles
+  loadingContainer: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 20,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  loadingText: {
+    fontSize: 14,
+    color: '#666',
+    marginTop: 8,
+  },
+  errorContainer: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 20,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  errorText: {
+    fontSize: 14,
+    color: '#ff4444',
+    textAlign: 'center',
+    marginVertical: 8,
+  },
+  retryButton: {
+    backgroundColor: '#9a0f21',
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    marginTop: 8,
+  },
+  retryButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  apiReservationsContainer: {
+    gap: 8,
+  },
+  apiReservationCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    padding: 12,
+    gap: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  apiReservationText: {
+    fontSize: 14,
+    color: '#333',
+    fontWeight: '500',
+  },
+  noReservationsText: {
+    fontSize: 14,
+    color: '#666',
+    textAlign: 'center',
+    fontStyle: 'italic',
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    padding: 16,
   },
 });
 

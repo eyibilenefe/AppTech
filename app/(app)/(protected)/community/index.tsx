@@ -1,22 +1,48 @@
 import FiltersModal from '@/components/community/FiltersModal';
+import { useSupabase } from '@/context/supabase-provider';
+import { supabase } from '@/utils/supabase';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
-    FlatList,
-    SafeAreaView,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  Image,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View
 } from 'react-native';
 
-// Types
+// Database Types
+interface DatabaseCommunity {
+  id: string;
+  name: string;
+  mail: string;
+  description: string;
+  logo: string; // storage path
+}
+
+interface DatabaseEvent {
+  id: string;
+  title: string;
+  start_time: string;
+  end_time: string;
+  description: string;
+  photo: string; // storage path
+  community_id: string;
+}
+
+// UI Types (keeping the same structure for compatibility)
 interface Community {
   id: string;
   name: string;
-  logo: string;
+  logo: string; // Will contain full URL after processing
+  memberCount: number;
+  isFollowing: boolean;
 }
 
 interface Event {
@@ -24,7 +50,7 @@ interface Event {
   name: string;
   date: string;
   location: string;
-  community: string;
+  community: Community;
   thumbnail: string;
   description: string;
 }
@@ -32,90 +58,291 @@ interface Event {
 interface FilterState {
   followStatus: 'all' | 'following' | 'not_following';
   selectedCommunities: string[];
-  eventTypes: string[];
 }
 
-// Mock data
-const communities: Community[] = [
-  { id: 'cs', name: 'Software Society', logo: '💻' },
-  { id: 'engineering', name: 'Engineering', logo: '⚙️' },
-  { id: 'sports', name: 'Sports Club', logo: '⚽' },
-  { id: 'music', name: 'Music Society', logo: '🎵' },
-  { id: 'debate', name: 'Debate Club', logo: '🗣️' },
-  { id: 'art', name: 'Art Club', logo: '🎨' },
-];
+// Extended community type with events
+interface CommunityWithEvents extends DatabaseCommunity {
+  logo_url: string;
+  events: DatabaseEvent[];
+}
 
-// Create a lookup map for community name to ID
-const communityNameToId: Record<string, string> = {
-  'Computer Science': 'cs',
-  'Engineering': 'engineering', 
-  'Sports Club': 'sports',
-  'Music Society': 'music',
-  'Debate Club': 'debate',
-  'Art Club': 'art',
-};
-
-const filterTags: string[] = ['All Events', 'Following', 'Sports', 'Science', 'Arts', 'Music', 'Technology'];
-
-const events: Event[] = [
-  {
-    id: '1',
-    name: 'React Native Workshop',
-    date: 'Dec 15, 2024',
-    location: 'Computer Lab 101',
-    community: 'Computer Science',
-    thumbnail: '💻',
-    description: 'Learn React Native development basics',
-  },
-  {
-    id: '2',
-    name: 'Basketball Tournament',
-    date: 'Dec 16, 2024',
-    location: 'Sports Center',
-    community: 'Sports Club',
-    thumbnail: '🏀',
-    description: 'Inter-department basketball competition',
-  },
-  {
-    id: '3',
-    name: 'Music Concert',
-    date: 'Dec 17, 2024',
-    location: 'Main Auditorium',
-    community: 'Music Society',
-    thumbnail: '🎤',
-    description: 'Annual winter music concert',
-  },
-  {
-    id: '4',
-    name: 'Art Exhibition',
-    date: 'Dec 18, 2024',
-    location: 'Gallery Hall',
-    community: 'Art Club',
-    thumbnail: '🎨',
-    description: 'Student artwork showcase',
-  },
-  {
-    id: '5',
-    name: 'Debate Championship',
-    date: 'Dec 19, 2024',
-    location: 'Conference Room A',
-    community: 'Debate Club',
-    thumbnail: '🗣️',
-    description: 'Annual debate championship finals',
-  },
-];
+const filterTags: string[] = ['All Events', 'Following Communities', 'Registered Events', 'Not Following Communities', 'Not Registered Events'];
 
 const CommunityEventFeed = () => {
   const router = useRouter();
+  const { user } = useSupabase();
   const [selectedCommunity, setSelectedCommunity] = useState('all');
   const [selectedFilter, setSelectedFilter] = useState('All Events');
-  const [currentWeek, setCurrentWeek] = useState('This Week');
   const [showFiltersModal, setShowFiltersModal] = useState(false);
   const [appliedFilters, setAppliedFilters] = useState<FilterState>({
     followStatus: 'all',
     selectedCommunities: [],
-    eventTypes: [],
   });
+
+  // State for Supabase data
+  const [communities, setCommunities] = useState<Community[]>([]);
+  const [events, setEvents] = useState<Event[]>([]);
+  const [allEvents, setAllEvents] = useState<Event[]>([]); // Store all events for filtering
+  const [userRegistrations, setUserRegistrations] = useState<string[]>([]); // User's registered event IDs
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Fetch signed URL for images from Supabase storage
+  const getImageUrl = async (path: string, bucket: string = 'community-assets'): Promise<string> => {
+    try {
+      if (!path) return '';
+      
+      // Try to get public URL first
+      const { data } = supabase.storage
+        .from(bucket)
+        .getPublicUrl(path);
+      
+      if (data?.publicUrl) {
+        return data.publicUrl;
+      }
+
+      // If public URL doesn't work, try signed URL (for private buckets)
+      const { data: signedData, error: signedError } = await supabase.storage
+        .from(bucket)
+        .createSignedUrl(path, 3600); // 1 hour expiry
+
+      if (signedError) {
+        console.error('Error creating signed URL:', signedError);
+        return '';
+      }
+
+      return signedData?.signedUrl || '';
+    } catch (error) {
+      console.error('Error getting image URL:', error);
+      return '';
+    }
+  };
+
+  // Fetch user's community memberships
+  const fetchUserMemberships = async (): Promise<string[]> => {
+    if (!user) return [];
+    
+    try {
+      const { data, error } = await supabase
+        .from('community_members')
+        .select('community_id')
+        .eq('user_id', user.id);
+
+      if (error) {
+        console.error('Error fetching user memberships:', error);
+        return [];
+      }
+
+      return (data || []).map(membership => membership.community_id);
+    } catch (error) {
+      console.error('Error fetching user memberships:', error);
+      return [];
+    }
+  };
+
+  // Fetch user's event registrations
+  const fetchUserRegistrations = async (): Promise<string[]> => {
+    if (!user) return [];
+    
+    try {
+      const { data, error } = await supabase
+        .from('attenders')
+        .select('event_id')
+        .eq('user_id', user.id);
+
+      if (error) {
+        console.error('Error fetching user registrations:', error);
+        return [];
+      }
+
+      return (data || []).map(registration => registration.event_id);
+    } catch (error) {
+      console.error('Error fetching user registrations:', error);
+      return [];
+    }
+  };
+
+  // Fetch member count for each community
+  const fetchMemberCounts = async (communityIds: string[]): Promise<Record<string, number>> => {
+    try {
+      const { data, error } = await supabase
+        .from('community_members')
+        .select('community_id')
+        .in('community_id', communityIds);
+
+      if (error) {
+        console.error('Error fetching member counts:', error);
+        return {};
+      }
+
+      // Count members for each community
+      const counts: Record<string, number> = {};
+      (data || []).forEach(member => {
+        counts[member.community_id] = (counts[member.community_id] || 0) + 1;
+      });
+
+      return counts;
+    } catch (error) {
+      console.error('Error fetching member counts:', error);
+      return {};
+    }
+  };
+
+  // Fetch communities and their upcoming events
+  const fetchCommunitiesAndEvents = async (isRefresh: boolean = false) => {
+    try {
+      if (isRefresh) {
+        setRefreshing(true);
+      } else {
+        setLoading(true);
+      }
+      setError(null);
+
+      // Fetch communities
+      const { data: communitiesData, error: communitiesError } = await supabase
+        .from('communities')
+        .select('*')
+        .order('name');
+
+      if (communitiesError) {
+        throw communitiesError;
+      }
+
+      // Fetch upcoming events (only events where start_time >= now())
+      const { data: eventsData, error: eventsError } = await supabase
+        .from('events')
+        .select(`
+          *,
+          communities:community_id (
+            id,
+            name,
+            logo
+          )
+        `)
+        .gte('start_time', new Date().toISOString())
+        .order('start_time', { ascending: true });
+
+      if (eventsError) {
+        throw eventsError;
+      }
+
+      // Fetch user memberships, registrations, and member counts
+      const userMemberships = await fetchUserMemberships();
+      const userEventRegistrations = await fetchUserRegistrations();
+      const communityIds = (communitiesData || []).map(c => c.id);
+      const memberCounts = await fetchMemberCounts(communityIds);
+
+      // Process communities data and get logo URLs
+      const processedCommunities = await Promise.all(
+        (communitiesData || []).map(async (community: DatabaseCommunity) => {
+          return {
+            id: community.id,
+            name: community.name,
+            logo: community.logo || '🏢', // fallback emoji if no image
+            memberCount: memberCounts[community.id] || 0,
+            isFollowing: userMemberships.includes(community.id),
+          };
+        })
+      );
+
+      // Process events data and get photo URLs
+      const processedEvents = await Promise.all(
+        (eventsData || []).map(async (event: any) => {
+          const photoUrl = await getImageUrl(event.photo, 'community-assets');
+          
+          // Format the event to match the existing UI structure
+          return {
+            id: event.id,
+            name: event.title,
+            date: new Date(event.start_time).toLocaleDateString('en-US', {
+              month: 'short',
+              day: 'numeric',
+              year: 'numeric'
+            }),
+            location: 'TBA', // You might want to add a location field to your events table
+            community: event.communities,
+            thumbnail: photoUrl || '📅', // fallback emoji if no image
+            description: event.description || 'No description available',
+          };
+        })
+      );
+
+      setCommunities(processedCommunities);
+      setAllEvents(processedEvents); // Store all events
+      setUserRegistrations(userEventRegistrations); // Store user registrations
+      setEvents(processedEvents); // Initially show all events
+    } catch (error: any) {
+      console.error('Error fetching data:', error);
+      setError(error.message || 'Failed to fetch data');
+      Alert.alert('Error', 'Failed to load communities and events. Please try again.');
+    } finally {
+      if (isRefresh) {
+        setRefreshing(false);
+      } else {
+        setLoading(false);
+      }
+    }
+  };
+
+  // Handle pull-to-refresh
+  const onRefresh = () => {
+    fetchCommunitiesAndEvents(true);
+  };
+
+  // Handle retry button press
+  const handleRetry = () => {
+    fetchCommunitiesAndEvents(false);
+  };
+
+  // Fetch data when component mounts
+  useEffect(() => {
+    fetchCommunitiesAndEvents();
+  }, []);
+
+  // Filter events based on selected filter
+  const filterEvents = React.useCallback((filterType: string): Event[] => {
+    switch (filterType) {
+      case 'All Events':
+        return allEvents;
+      
+      case 'Following Communities':
+        return allEvents.filter(event => {
+          const community = communities.find(c => c.id === event.community.id);
+          return community?.isFollowing || false;
+        });
+      
+      case 'Registered Events':
+        return allEvents.filter(event => userRegistrations.includes(event.id));
+      
+      case 'Not Following Communities':
+        return allEvents.filter(event => {
+          const community = communities.find(c => c.id === event.community.id);
+          return !community?.isFollowing;
+        });
+      
+      case 'Not Registered Events':
+        return allEvents.filter(event => !userRegistrations.includes(event.id));
+      
+      default:
+        return allEvents;
+    }
+  }, [allEvents, communities, userRegistrations]);
+
+  // Update events when filter changes
+  React.useEffect(() => {
+    const filteredEvents = filterEvents(selectedFilter);
+    setEvents(filteredEvents);
+  }, [selectedFilter, filterEvents]);
+
+  // Create a lookup map for community name to ID
+  const communityNameToId: Record<string, string> = React.useMemo(() => {
+    const lookup: Record<string, string> = {};
+    communities.forEach(community => {
+      lookup[community.name] = community.id;
+    });
+    return lookup;
+  }, [communities]);
 
   const renderCommunityIcon = ({ item }: { item: Community }) => (
     <TouchableOpacity
@@ -131,7 +358,16 @@ const CommunityEventFeed = () => {
         styles.communityLogoContainer,
         selectedCommunity === item.id && styles.selectedCommunityLogoContainer
       ]}>
-        <Text style={styles.communityLogo}>{item.logo}</Text>
+        <View>
+          {item.logo.startsWith('http') ? (
+            <Image
+              source={{ uri: item.logo }}
+              style={{width: 50, height: 50, borderRadius: 25}}
+            />
+          ) : (
+            <Text className='text-2xl'>🛖</Text>
+          )}
+        </View>
       </View>
       <Text style={styles.communityName} numberOfLines={1}>
         {item.name}
@@ -171,34 +407,43 @@ const CommunityEventFeed = () => {
             location: item.location,
             description: item.description,
             thumbnail: item.thumbnail,
-            community: item.community,
-            // Use the lookup map for better accuracy
-            communityId: communityNameToId[item.community] || 'unknown'
+            community: item.community.name,
+            communityId: item.community.id,
+            communityLogo: item.community.logo,
           }
         });
       }}
     >
       <View style={styles.eventThumbnail}>
-        <Text style={styles.eventThumbnailText}>{item.thumbnail}</Text>
+        <Text style={styles.eventThumbnailText}>
+          {item.thumbnail.startsWith('http') ? '📅' : item.thumbnail}
+        </Text>
       </View>
       <View style={styles.eventDetails}>
-        <Text style={styles.eventName}>{item.name}</Text>
-        <Text style={styles.eventDate}>{item.date}</Text>
-        <Text style={styles.eventLocation}>📍 {item.location}</Text>
-        <Text style={styles.eventCommunity}>{item.community}</Text>
+        <View className='flex-col justify-start'>
+          <Text style={styles.eventName}>{item.name}</Text>
+          <Text style={styles.eventDate}>{item.date}</Text>
+        </View>
+        <Text style={styles.eventCommunity}>{item.community.name}</Text>
       </View>
     </TouchableOpacity>
   );
 
-  const changeWeek = (direction: 'left' | 'right') => {
-    // Handle week navigation logic here
-    console.log(`Navigate week ${direction}`);
-  };
 
   const handleFiltersApply = (filters: FilterState) => {
     setAppliedFilters(filters);
-    // Here you would filter the events based on the applied filters
-    console.log('Applied filters:', filters);
+    
+    // Apply advanced filters on top of basic filter
+    let filteredEvents = filterEvents(selectedFilter);
+    
+    // Further filter by selected communities if any are chosen
+    if (filters.selectedCommunities.length > 0) {
+      filteredEvents = filteredEvents.filter(event => 
+        filters.selectedCommunities.includes(event.community.id)
+      );
+    }
+    
+    setEvents(filteredEvents);
   };
 
   const openFiltersModal = () => {
@@ -212,6 +457,29 @@ const CommunityEventFeed = () => {
   const navigateToCommunitiesList = () => {
     router.push('/(app)/(protected)/community/list');
   };
+
+  // Show loading state
+  if (loading) {
+    return (
+      <SafeAreaView style={[styles.container, styles.centerContainer]}>
+        <ActivityIndicator size="large" color="#9a0f21" />
+        <Text style={styles.loadingText}>Loading communities...</Text>
+      </SafeAreaView>
+    );
+  }
+
+  // Show error state
+  if (error) {
+    return (
+      <SafeAreaView style={[styles.container, styles.centerContainer]}>
+        <MaterialIcons name="error-outline" size={48} color="#f44336" />
+        <Text style={styles.errorText}>Failed to load data</Text>
+        <TouchableOpacity style={styles.retryButton} onPress={handleRetry}>
+          <Text style={styles.retryButtonText}>Retry</Text>
+        </TouchableOpacity>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>
@@ -251,23 +519,6 @@ const CommunityEventFeed = () => {
         </ScrollView>
       </View>
 
-      {/* Week Navigation */}
-      <View style={styles.weekNavigation}>
-        <TouchableOpacity
-          style={styles.weekArrow}
-          onPress={() => changeWeek('left')}
-        >
-          <MaterialIcons name="chevron-left" size={24} color="#333" />
-        </TouchableOpacity>
-        <Text style={styles.weekText}>{currentWeek}</Text>
-        <TouchableOpacity
-          style={styles.weekArrow}
-          onPress={() => changeWeek('right')}
-        >
-          <MaterialIcons name="chevron-right" size={24} color="#333" />
-        </TouchableOpacity>
-      </View>
-
       {/* Events List */}
       <FlatList
         data={events}
@@ -275,6 +526,15 @@ const CommunityEventFeed = () => {
         keyExtractor={(item) => item.id}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.eventsList}
+        refreshing={refreshing}
+        onRefresh={onRefresh}
+        ListEmptyComponent={
+          <View style={styles.emptyContainer}>
+            <MaterialIcons name="event" size={48} color="#ccc" />
+            <Text style={styles.emptyText}>No upcoming events found</Text>
+            <Text style={styles.emptySubtext}>Check back later for new events!</Text>
+          </View>
+        }
       />
 
       {/* Filters Modal */}
@@ -282,6 +542,7 @@ const CommunityEventFeed = () => {
         visible={showFiltersModal}
         onClose={closeFiltersModal}
         onApply={handleFiltersApply}
+        communities={communities}
       />
     </SafeAreaView>
   );
@@ -291,6 +552,52 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#fff',
+  },
+  centerContainer: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: '#666',
+  },
+  errorText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: '#f44336',
+    textAlign: 'center',
+  },
+  retryButton: {
+    marginTop: 16,
+    backgroundColor: '#9a0f21',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  retryButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 48,
+  },
+  emptyText: {
+    marginTop: 16,
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#333',
+    textAlign: 'center',
+  },
+  emptySubtext: {
+    marginTop: 8,
+    fontSize: 14,
+    color: '#666',
+    textAlign: 'center',
   },
   header: {
     flexDirection: 'row',

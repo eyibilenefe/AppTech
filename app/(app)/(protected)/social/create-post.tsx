@@ -250,6 +250,7 @@ const styles = StyleSheet.create({
   },
   userSection: {
     flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: 'white',
     padding: 16,
     borderBottomWidth: 1,
