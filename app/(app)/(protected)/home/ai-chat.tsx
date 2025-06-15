@@ -35,7 +35,8 @@ const AIChatScreen = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);  const [userId, setUserId] = useState<string | undefined>(undefined);
+  const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
+  const [userId, setUserId] = useState<string | undefined>(undefined);
   const flatListRef = useRef<FlatList>(null);
 
   // Kullanıcı authentication state'ini kontrol et
@@ -189,7 +190,7 @@ const AIChatScreen = () => {
           </View>        ) : (
           <>
             <Text style={[styles.messageText, item.isUser ? styles.userText : styles.botText]}>
-              {item.text || ''}
+              {item.text ?? ''}
             </Text>
             <Text style={[styles.messageTime, item.isUser ? styles.userTime : styles.botTime]}>
               {item.timestamp ? item.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
