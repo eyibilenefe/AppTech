@@ -2,7 +2,19 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
-import { ActivityIndicator, Dimensions, Image, KeyboardAvoidingView, Platform, ScrollView, StatusBar, StyleSheet, TouchableOpacity, View } from "react-native";
+import {
+	ActivityIndicator,
+	Dimensions,
+	Image,
+	KeyboardAvoidingView,
+	Platform,
+	ScrollView,
+	StatusBar,
+	StyleSheet,
+	TouchableOpacity,
+	View,
+	Animated,
+} from "react-native";
 import * as z from "zod";
 
 import { Button } from "@/components/ui/button";
@@ -38,7 +50,11 @@ const formSchema = z.object({
 export default function SignIn() {
 	const { signInWithUniversityApi } = useSupabase();
 	const [passwordVisible, setPasswordVisible] = useState(false);
-	const [rememberMe, setRememberMe] = useState(false);
+	const [isLoading, setIsLoading] = useState(false);
+	const [error, setError] = useState<string | null>(null);
+	const [username, setUsername] = useState<string | null>(null);
+
+    const welcomeAnimation = useState(new Animated.Value(0))[0];
 
 	const form = useForm<z.infer<typeof formSchema>>({
 		resolver: zodResolver(formSchema),
@@ -50,11 +66,15 @@ export default function SignIn() {
 
 	async function onSubmit(data: z.infer<typeof formSchema>) {
 		try {
+			setIsLoading(true);
+			setError(null);
 			await signInWithUniversityApi(data.email, data.password);
-            // await signInWithPassword(data.email, data.password);
 			form.reset();
 		} catch (error: Error | any) {
-			console.log("onSubmit error after signInWithUniversityApi:", error.message);
+			console.error("Login error:", error);
+			setError(error.message || "An error occurred during login");
+		} finally {
+			setIsLoading(false);
 		}
 	}
 
@@ -62,77 +82,95 @@ export default function SignIn() {
 		setPasswordVisible(!passwordVisible);
 	};
 
-	const toggleRememberMe = () => {
-		setRememberMe(!rememberMe);
+	const handleEmailChange = (text: string) => {
+		form.setValue("email", text);
+        // Regex for isimsoyisim@std.iyte.edu.tr or isimsoyisim@iyte.edu.tr
+		const regex = /^([a-zA-Z0-9_.-]+)@(?:std\.)?iyte\.edu\.tr$/i;
+		const match = text.match(regex);
+
+		if (match) {
+			const name = match[1].replace(/[._-]/g, ' '); // Replace dots, underscores, or hyphens with a space
+            const formattedName = name.split(' ').map(part => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase()).join(' ');
+			setUsername(`Merhaba, ${formattedName}`);
+            Animated.timing(welcomeAnimation, {
+                toValue: 1,
+                duration: 300,
+                useNativeDriver: true,
+            }).start();
+		} else {
+			setUsername(null);
+            Animated.timing(welcomeAnimation, {
+                toValue: 0,
+                duration: 300,
+                useNativeDriver: true,
+            }).start();
+		}
 	};
 
+
 	return (
-		<KeyboardAvoidingView 
+		<KeyboardAvoidingView
 			behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
 			style={styles.container}
 		>
-			<StatusBar barStyle="dark-content" />
-			
-			<Image
-				source={require("@/assets/images/login_screen/teknopark.jpg")}
-				style={styles.backgroundImage}
-				resizeMode="cover"
-			/>
+			<StatusBar barStyle="light-content" />
 
-			<Image 
-				source={require('@/assets/images/home/signin-bg.png')}
-				style={styles.backgroundImage}
-				resizeMode="cover"
-			/>
-			
-			<View style={styles.logoContainer}>
+			{/* Background Images */}
+			<View style={styles.backgroundImageContainer}>
 				<Image
-					source={require("@/assets/images/logo/dc-logo-black.png")}
-					style={styles.logo}
+					source={require("@/assets/images/login_screen/teknopark.jpg")}
+					style={styles.backgroundImage}
+					resizeMode="cover"
+				/>
+				<Image
+					source={require('@/assets/images/home/signin-bg.png')}
+					style={styles.backgroundImage}
+					resizeMode="cover"
 				/>
 			</View>
 
-			<View style={styles.title}>
-				<Text className="text-4xl font-bold text-white">Sign In</Text>
-			</View>
+			{/* Header */}
+            <View style={styles.headerContainer}>
+                <View style={styles.logoContainer}>
+                    <Image
+                        source={require("@/assets/images/logo/dc-logo-black.png")}
+                        style={styles.logo}
+                    />
+                </View>
+                <View style={styles.titleContainer}>
+                    <Text style={styles.title}>Sign In</Text>
+                    {username && (
+                        <Animated.View style={{ opacity: welcomeAnimation }}>
+                            <Text style={styles.welcomeMessage}>{username}</Text>
+                        </Animated.View>
+                    )}
+                </View>
+            </View>
 
 
-			<KeyboardAvoidingView 
-                style={styles.formContainer}
-                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-                keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
-            >
-				<ScrollView 
-					showsVerticalScrollIndicator={false} 
-					className="flex-1"
-					keyboardShouldPersistTaps="handled"
-					contentContainerStyle={{ flexGrow: 1, paddingBottom: 100 }}
-				>
-					{/* Form Header */}
-					<View className="mb-8">
-						<Text className="text-2xl font-bold text-gray-800 mb-2">Welcome Back</Text>
-						<Text className="text-base text-gray-500">Sign in to continue to your account</Text>
-					</View>
-
+			{/* Form */}
+			<ScrollView
+				style={styles.formScrollView}
+				showsVerticalScrollIndicator={false}
+				keyboardShouldPersistTaps="handled"
+				contentContainerStyle={styles.formContentContainer}
+			>
 					<Form {...form}>
-						<View className="flex flex-col gap-4">
+						<View style={{ gap: 16, flexDirection: 'column' }}>
 							{/* Email Field */}
 							<FormField
 								control={form.control}
 								name="email"
 								render={({ field }) => (
-									<View className="space-y-4">
-										<Text className="text-sm font-medium text-gray-700 ml-1">Email Address</Text>
-										<View className="relative">
-											<View className="absolute left-6 top-1/2 -translate-y-1/2 z-10">
-												<MaterialIcons name="mail-outline" size={24} color="#EF4444" />
-											</View>
+									<View style={{ marginBottom: 16 }}>
+										<Text style={styles.label}>
+											Email Address
+										</Text>
+										<View style={styles.inputContainer}>
+											<MaterialIcons name="mail-outline" size={24} color="#EF4444" style={styles.icon} />
 											<FormInput
-                                                style={{
-                                                    height: 56,
-                                                }}
-												className="pl-16 pr-6 bg-white border-2 border-gray-200 rounded-xl text-gray-800 placeholder:text-gray-400 focus:border-red-500 focus:bg-red-50/30 transition-colors text-base"
-												placeholder="Enter your email"
+												style={styles.input}
+												placeholder="isimsoyisim@iyte.edu.tr"
 												autoCapitalize="none"
 												autoComplete="email"
 												autoCorrect={false}
@@ -140,6 +178,7 @@ export default function SignIn() {
 												keyboardAppearance="light"
 												placeholderTextColor="#9CA3AF"
 												{...field}
+												onChangeText={handleEmailChange}
 											/>
 										</View>
 									</View>
@@ -151,17 +190,14 @@ export default function SignIn() {
 								control={form.control}
 								name="password"
 								render={({ field }) => (
-									<View className="space-y-4 mb-6">
-										<Text className="text-sm font-medium text-gray-700 ml-1">Password</Text>
-										<View className="relative">
-											<View className="absolute left-6 top-1/2 -translate-y-1/2 z-10">
-												<MaterialIcons name="lock-outline" size={24} color="#EF4444" />
-											</View>
+									<View style={{ marginBottom: 24 }}>
+										<Text style={styles.label}>
+											Password
+										</Text>
+										<View style={styles.inputContainer}>
+											<MaterialIcons name="lock-outline" size={24} color="#EF4444" style={styles.icon} />
 											<FormInput
-                                                style={{
-                                                    height: 56,
-                                                }}
-												className="pl-16 pr-16 bg-white border-2 border-gray-200 rounded-xl text-gray-800 placeholder:text-gray-400 focus:border-red-500 focus:bg-red-50/30 transition-colors text-base"
+												style={styles.input}
 												placeholder="Enter your password"
 												autoCapitalize="none"
 												autoCorrect={false}
@@ -171,15 +207,15 @@ export default function SignIn() {
 												placeholderTextColor="#9CA3AF"
 												{...field}
 											/>
-											<TouchableOpacity 
-												className="absolute right-6 top-1/2 -translate-y-1/2 z-10 p-2" 
+											<TouchableOpacity
+												style={styles.rightIcon}
 												onPress={togglePasswordVisibility}
 												activeOpacity={0.7}
 											>
-												<MaterialIcons 
-													name={passwordVisible ? "visibility" : "visibility-off"} 
-													size={24} 
-													color="#6B7280" 
+												<MaterialIcons
+													name={passwordVisible ? "visibility" : "visibility-off"}
+													size={24}
+													color="#6B7280"
 												/>
 											</TouchableOpacity>
 										</View>
@@ -190,35 +226,36 @@ export default function SignIn() {
 					</Form>
 
 					{/* Login Button */}
-					<View className="mt-8">
+					<View style={{ marginTop: 32 }}>
 						<Button
-							className="h-14 bg-gradient-to-r from-red-500 to-red-600 rounded-xl active:scale-[0.98] transition-transform"
-							style={{
-								backgroundColor: '#EF4444',
-								elevation: 8,
-							}}
+							style={styles.loginButton}
 							onPress={form.handleSubmit(onSubmit)}
 							disabled={form.formState.isSubmitting}
 						>
 							{form.formState.isSubmitting ? (
-								<View className="flex-row items-center justify-center space-x-2">
+								<View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
 									<ActivityIndicator color="#fff" size="small" />
-									<Text className="text-white font-semibold text-base ml-2">Signing In...</Text>
+									<Text style={styles.loginButtonText}>
+										Signing In...
+									</Text>
 								</View>
 							) : (
-								<Text className="text-white font-semibold text-base tracking-wide">Sign In</Text>
+								<Text style={styles.loginButtonText}>
+									Sign In
+								</Text>
 							)}
 						</Button>
 					</View>
 
 					{/* Forgot Password Link */}
-					<View className="mt-6 items-center">
+					<View style={{ marginTop: 24, alignItems: 'center' }}>
 						<TouchableOpacity activeOpacity={0.7}>
-							<Text className="text-red-500 font-medium text-sm">Forgot your password?</Text>
+							<Text style={styles.forgotText}>
+								Forgot your password?
+							</Text>
 						</TouchableOpacity>
 					</View>
-				</ScrollView>
-			</KeyboardAvoidingView>
+			</ScrollView>
 		</KeyboardAvoidingView>
 	);
 }
@@ -228,15 +265,26 @@ const styles = StyleSheet.create({
 		flex: 1,
 		backgroundColor: COLORS.background,
 	},
-	backgroundImage: {
+	backgroundImageContainer: {
 		position: 'absolute',
 		top: 0,
-		width: width,
+		left: 0,
+		width: '100%',
 		height: height * 0.5,
 	},
+	backgroundImage: {
+		position: 'absolute',
+		width: '100%',
+		height: '100%',
+	},
+    headerContainer: {
+        height: height * 0.4,
+        justifyContent: 'flex-start',
+        paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
+    },
 	logoContainer: {
 		position: 'absolute',
-		top: 60,
+		top: (Platform.OS === 'android' ? StatusBar.currentHeight : 0) + 40,
 		left: 20,
 		width: 50,
 		height: 50,
@@ -250,133 +298,101 @@ const styles = StyleSheet.create({
 		width: 40,
 		height: 40,
 	},
-	title: {
-		fontSize: 32,
-		fontWeight: '700',
-		color: COLORS.text,
+	titleContainer: {
 		position: 'absolute',
-		top: 120,
+		top: (Platform.OS === 'android' ? StatusBar.currentHeight : 0) + 100,
 		left: 20,
 	},
-	formContainer: {
-		position: 'absolute',
-		bottom: 0,
-		left: 0,
-		right: 0,
-		height: height * 0.65,
-		backgroundColor: 'rgba(255, 255, 255, 0.98)',
+    title: {
+        fontSize: 32,
+        fontWeight: '700',
+        color: 'white',
+        textShadowColor: 'rgba(0, 0, 0, 0.25)',
+        textShadowOffset: {width: 0, height: 2},
+        textShadowRadius: 4,
+    },
+    welcomeMessage: {
+        fontSize: 20,
+        fontWeight: '600',
+        color: 'white',
+        marginTop: 8,
+        textShadowColor: 'rgba(0, 0, 0, 0.25)',
+        textShadowOffset: {width: 0, height: 1},
+        textShadowRadius: 2,
+    },
+	formScrollView: {
+        flex: 1,
+		backgroundColor: 'white',
 		borderTopLeftRadius: 30,
 		borderTopRightRadius: 30,
-		paddingHorizontal: 24,
-		paddingTop: 40,
-		paddingBottom: 40,
 		elevation: 10,
+		shadowColor: '#000',
+		shadowOffset: { width: 0, height: -10 },
+		shadowOpacity: 0.1,
+		shadowRadius: 10,
 	},
-	inputsContainer: {
-		marginTop: 20,
-	},
-	inputWrapper: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		width: '100%',
-		height: 56,
-		backgroundColor: 'rgba(255, 255, 255, 0.9)',
-		borderRadius: 12,
-		marginBottom: 20,
-		position: 'relative',
-	},
+    formContentContainer: {
+        flexGrow: 1,
+        justifyContent: 'center',
+        paddingHorizontal: 24,
+		paddingVertical: 40,
+    },
+    label: {
+        fontSize: 14,
+        fontWeight: '500',
+        color: '#374151',
+        marginLeft: 4,
+        marginBottom: 8
+    },
+    inputContainer: {
+        position: 'relative',
+        justifyContent: 'center'
+    },
 	input: {
 		height: 56,
-		paddingLeft: 48,
-		paddingRight: 16,
+		paddingLeft: 56,
+		paddingRight: 56, // Make space for the right icon
+		backgroundColor: 'white',
+		borderWidth: 2,
+		borderColor: '#E5E7EB',
+		borderRadius: 16,
+		color: '#111827',
 		fontSize: 16,
-		color: COLORS.text,
 	},
-	iconContainer: {
+	icon: {
 		position: 'absolute',
-		left: 16,
-		width: 24,
-		height: 56,
-		justifyContent: 'center',
-		alignItems: 'center',
-		zIndex: 10,
+		left: 20,
+		zIndex: 1,
 	},
-	rightIconContainer: {
+	rightIcon: {
 		position: 'absolute',
 		right: 16,
-		width: 24,
-		height: 56,
-		justifyContent: 'center',
-		alignItems: 'center',
-		zIndex: 10,
-	},
-	optionsContainer: {
-		flexDirection: 'row',
-		justifyContent: 'space-between',
-		alignItems: 'center',
-		marginTop: 10,
-		marginBottom: 10,
-	},
-	rememberContainer: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		gap: 8,
-	},
-	checkbox: {
-		width: 20,
-		height: 20,
-		borderWidth: 2,
-		borderColor: COLORS.primary,
-		borderRadius: 4,
-		justifyContent: 'center',
-		alignItems: 'center',
-	},
-	checkboxChecked: {
-		backgroundColor: COLORS.primary,
-	},
-	rememberText: {
-		color: COLORS.lightText,
-		fontSize: 14,
-	},
-	forgotText: {
-		color: COLORS.primary,
-		fontSize: 14,
-		fontWeight: '500',
+		zIndex: 1,
+		padding: 4,
+        height: '100%',
+        justifyContent: 'center',
 	},
 	loginButton: {
-		backgroundColor: COLORS.primary,
 		height: 56,
-		borderRadius: 28,
-		marginTop: 40,
-		justifyContent: 'center',
-		alignItems: 'center',
-		shadowColor: COLORS.primary,
-		shadowOffset: {
-			width: 0,
-			height: 4,
-		},
-		shadowOpacity: 0.3,
-		shadowRadius: 8,
+		backgroundColor: '#EF4444',
+		borderRadius: 16,
 		elevation: 8,
-	},
-	loginButtonText: {
-		color: '#fff',
-		fontSize: 16,
-		fontWeight: '600',
-	},
-	signupContainer: {
-		flexDirection: 'row',
 		justifyContent: 'center',
 		alignItems: 'center',
-		marginTop: 24,
+        shadowColor: '#EF4444',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
 	},
-	signupText: {
-		color: COLORS.lightText,
-		fontSize: 14,
-	},
-	signupLink: {
-		color: COLORS.primary,
-		fontSize: 14,
-		fontWeight: '600',
-	},
+    loginButtonText: {
+        color: 'white',
+        fontWeight: '600',
+        fontSize: 16
+    },
+    forgotText: {
+        color: '#EF4444',
+        fontWeight: '500',
+        fontSize: 14
+    }
 });
+''
