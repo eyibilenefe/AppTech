@@ -54,6 +54,7 @@
     "html-to-text": "^9.0.5",
     "http": "^0.0.1-security",
     "nativewind": "^4.1.23",
+    "papaparse": "^5.5.3",
     "react": "19.0.0",
     "react-dom": "19.0.0",
     "react-hook-form": "^7.56.4",
@@ -74,6 +75,7 @@
   "devDependencies": {
     "@babel/core": "^7.25.2",
     "@react-native-community/cli": "^18.0.0",
+    "@types/papaparse": "^5.3.16",
     "@types/react": "~19.0.10",
     "eslint": "^9.25.0",
     "eslint-config-expo": "~9.2.0",

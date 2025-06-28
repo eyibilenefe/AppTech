@@ -1,11 +1,12 @@
 import { Ionicons } from '@expo/vector-icons';
-import BottomSheet, { BottomSheetView } from '@gorhom/bottom-sheet';
+import BottomSheet, { BottomSheetScrollView, BottomSheetView } from '@gorhom/bottom-sheet';
 import * as LocationExpo from 'expo-location';
 import { StatusBar } from 'expo-status-bar';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Dimensions, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import MapView, { AnimatedRegion, Marker, Polyline } from 'react-native-maps';
 
+import { getBusSchedules, ScheduleItem } from '@/app/api/eshots';
 import BusMarker from '@/components/BusMarker';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
@@ -13,7 +14,7 @@ import busStopsData from '@/data/bus-stops-real.json';
 
 // --- API and Configuration Constants ---
 const API_BASE_URL = 'https://openapi.izmir.bel.tr/api';
-const BUS_LINES = ['883', '882', '982', '981', '760']; // Example bus lines
+const BUS_LINES = ['882', '883']; // Sadece 882 ve 883 hatları
 const UPDATE_INTERVAL = 5000; // 5 seconds
 const MAX_RETRIES = 3;
 const RETRY_DELAY = 1000; // 1 second
@@ -22,9 +23,6 @@ const RETRY_DELAY = 1000; // 1 second
 const BUS_LINE_DETAILS: Record<string, { ends: [string, string]; label?: string }> = {
   '883': { ends: ['İYTE', 'Fahrettin Altay'], label: 'Express' },
   '882': { ends: ['İYTE', 'Urla'] },
-  '982': { ends: ['İYTE', 'Fahrettin Altay'] },
-  '981': { ends: ['Balıklıova', 'Fahrettin Altay'] },
-  '760': { ends: ['Urla', 'Çeşme'] },
 };
 
 // --- Utility Functions ---
@@ -71,21 +69,67 @@ const Transportation = () => {
   const mapRef = useRef<MapView>(null);
   
   // Bottom sheet snap points
-  const snapPoints = useMemo(() => ['25%', '50%', '90%'], []);
+  const snapPoints = useMemo(() => ['25%', '60%', '90%'], []);
   
   // State for map editing
   const [editMode, setEditMode] = useState<'none' | 'add_location' | 'add_route'>('none');
   const [showBuses, setShowBuses] = useState(true);
-  const [filterByActiveLine, setFilterByActiveLine] = useState(false);
+  const [filterByActiveLine, setFilterByActiveLine] = useState(true);
   const [userCurrentCoords, setUserCurrentCoords] = useState<RoutePoint | null>(null);
+  const [bottomSheetIndex, setBottomSheetIndex] = useState(1); // Track bottom sheet size
   
   // State for API data
   const [busLocations, setBusLocations] = useState<Bus[]>([]);
   const [busStops, setBusStops] = useState<BusStop[]>([]);
   const [activeBusLine, setActiveBusLine] = useState<string>(BUS_LINES[0]);
+  const [departureTimes, setDepartureTimes] = useState<string[]>([]);
+  const [returnTimes, setReturnTimes] = useState<string[]>([]);
+  const [isLoadingTimes, setIsLoadingTimes] = useState(false);
+  const [errorTimes, setErrorTimes] = useState<string | null>(null);
+  const [selectedDayType, setSelectedDayType] = useState<number>(1); // 1: Weekday, 2: Saturday, 3: Sunday
+
+  // Function to get current time in HH:MM format
+  const getCurrentTime = (): string => {
+    const now = new Date();
+    const hours = now.getHours().toString().padStart(2, '0');
+    const minutes = now.getMinutes().toString().padStart(2, '0');
+    return `${hours}:${minutes}`;
+  };
+
+  // Function to check if a time is the next bus (current time or next available)
+  const isNextBus = (time: string): boolean => {
+    const currentTime = getCurrentTime();
+    return time >= currentTime;
+  };
+
+  // Function to get day type based on current date
+  const getDayType = (): number => {
+    const today = new Date();
+    const dayOfWeek = today.getDay(); // Sunday is 0, Monday is 1, ..., Saturday is 6
+    
+    console.log('Current date:', today.toDateString());
+    console.log('Day of week:', dayOfWeek);
+    console.log('Day name:', ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][dayOfWeek]);
+
+    if (dayOfWeek === 0) {
+      console.log('Detected: Sunday -> TARIFE_ID = 3');
+      return 3; // Sunday
+    } else if (dayOfWeek === 6) {
+      console.log('Detected: Saturday -> TARIFE_ID = 2');
+      return 2; // Saturday
+    } else {
+      console.log('Detected: Weekday -> TARIFE_ID = 1');
+      return 1; // Weekday
+    }
+  };
 
   // State for map interaction
   const lastRegion = useRef<any>(null);
+
+  // Set initial day type on component mount
+  useEffect(() => {
+    setSelectedDayType(getDayType());
+  }, []);
 
   // Track map zoom level to control marker visibility
   const [currentZoomLevel, setCurrentZoomLevel] = useState(0.01);
@@ -126,11 +170,8 @@ const Transportation = () => {
   // Decide which buses should be rendered on the map (respects visibility toggle & optional filtering)
   const busesToRender = useMemo(() => {
     if (!showBuses) return [];
-    if (filterByActiveLine) {
-      return busLocations.filter(b => b.route === activeBusLine);
-    }
-    return busLocations;
-  }, [showBuses, filterByActiveLine, activeBusLine, busLocations]);
+    return busLocations.filter(b => b.route === activeBusLine);
+  }, [showBuses, activeBusLine, busLocations]);
 
   // Animated regions cache for smooth movement of bus markers
   const busAnimatedRegions = useRef<{ [id: string]: AnimatedRegion }>({});
@@ -175,6 +216,46 @@ const Transportation = () => {
     
     return () => clearInterval(intervalId);
   }, []);
+
+  // --- Fetch Bus Timetables ---
+  useEffect(() => {
+    const fetchTimetable = async () => {
+      if (!activeBusLine) return;
+
+      setIsLoadingTimes(true);
+      setErrorTimes(null);
+
+      try {
+        console.log(`Fetching timetable for line ${activeBusLine}, day type ${selectedDayType}`);
+        const schedules: ScheduleItem[] = await getBusSchedules(activeBusLine, selectedDayType);
+        console.log('Received schedules:', schedules);
+        
+        // GIDIS_SAATI ve DONUS_SAATI'ni ayır ve sırala
+        const departures = [...new Set(schedules
+          .map((item: ScheduleItem) => item.GIDIS_SAATI)
+          .filter(Boolean) // Boş değerleri filtrele
+        )].sort();
+        const returns = [...new Set(schedules
+          .map((item: ScheduleItem) => item.DONUS_SAATI)
+          .filter(Boolean) // Boş değerleri filtrele
+        )].sort();
+
+        console.log('Departure times:', departures);
+        console.log('Return times:', returns);
+
+        setDepartureTimes(departures);
+        setReturnTimes(returns);
+
+      } catch (error: any) {
+        console.error('Error fetching or parsing timetable:', error);
+        setErrorTimes(`Failed to load timetable: ${error.message}`);
+      } finally {
+        setIsLoadingTimes(false);
+      }
+    };
+
+    fetchTimetable();
+  }, [activeBusLine, selectedDayType]);
 
   // Whenever fresh bus location data arrives, smoothly move markers
   useEffect(() => {
@@ -277,6 +358,10 @@ const Transportation = () => {
           await delay(RETRY_DELAY * (i + 1));
           continue;
         }
+        if (response.status === 404) {
+          logWithTimestamp(`No bus location data available for line ${busLine} (404).`);
+          return [];
+        }
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
@@ -307,7 +392,7 @@ const Transportation = () => {
         if (i < MAX_RETRIES - 1) {
           await delay(RETRY_DELAY);
         } else {
-          Alert.alert('API Error', `Failed to fetch data for bus line ${busLine} after multiple retries.`);
+          logWithTimestamp(`Failed to fetch data for bus line ${busLine} after multiple retries.`);
           return [];
         }
       }
@@ -322,8 +407,23 @@ const Transportation = () => {
 
       // Gracefully handle cases where the API does not have stop data for the requested line
       if (response.status === 404) {
-        logWithTimestamp(`No stop data available for line ${busLine} (404).`);
-        setBusStops([]);
+        logWithTimestamp(`No stop data available for line ${busLine} (404). Using local data as fallback.`);
+        
+        // Fallback: Yerel JSON dosyasından durak verilerini kullan
+        const localStops = busStopsData.records
+          .filter(record => {
+            const routes = record[5].toString(); // DURAKTAN_GECEN_HATLAR
+            return routes.includes(busLine);
+          })
+          .map(record => ({
+            id: record[1].toString(), // DURAK_ID
+            title: record[2].toString(), // DURAK_ADI
+            latitude: typeof record[3] === 'number' ? record[3] : parseFloat(record[3].toString()), // ENLEM
+            longitude: typeof record[4] === 'number' ? record[4] : parseFloat(record[4].toString()), // BOYLAM
+            type: 'bus_stop' as const
+          }));
+        
+        setBusStops(localStops);
         return;
       }
 
@@ -341,7 +441,28 @@ const Transportation = () => {
       setBusStops(stops);
     } catch (error) {
       logWithTimestamp(`Error fetching bus stops for ${busLine}: ${error}`);
-      // Silently fail – keeping UX clean when stop data is unavailable or the API errors
+      
+      // Fallback: Hata durumunda da yerel JSON dosyasından durak verilerini kullan
+      try {
+        const localStops = busStopsData.records
+          .filter(record => {
+            const routes = record[5].toString(); // DURAKTAN_GECEN_HATLAR
+            return routes.includes(busLine);
+          })
+          .map(record => ({
+            id: record[1].toString(), // DURAK_ID
+            title: record[2].toString(), // DURAK_ADI
+            latitude: typeof record[3] === 'number' ? record[3] : parseFloat(record[3].toString()), // ENLEM
+            longitude: typeof record[4] === 'number' ? record[4] : parseFloat(record[4].toString()), // BOYLAM
+            type: 'bus_stop' as const
+          }));
+        
+        setBusStops(localStops);
+        logWithTimestamp(`Using local data as fallback for line ${busLine}`);
+      } catch (fallbackError) {
+        logWithTimestamp(`Fallback also failed for line ${busLine}: ${fallbackError}`);
+        setBusStops([]);
+      }
     }
   };
 
@@ -415,6 +536,42 @@ const Transportation = () => {
     getBusStops(busLine);
     setReverseDirection(false); // reset arrow orientation when user picks a different line
 
+    // Otomatik olarak yeni hattın saatlerini çek
+    const fetchNewLineSchedule = async () => {
+      try {
+        setIsLoadingTimes(true);
+        setErrorTimes(null);
+        
+        console.log(`Fetching new line schedule for ${busLine}, day type ${selectedDayType}`);
+        const schedules: ScheduleItem[] = await getBusSchedules(busLine, selectedDayType);
+        console.log('New line schedules received:', schedules);
+        
+        // GIDIS_SAATI ve DONUS_SAATI'ni ayır ve sırala
+        const departures = [...new Set(schedules
+          .map((item: ScheduleItem) => item.GIDIS_SAATI)
+          .filter(Boolean) // Boş değerleri filtrele
+        )].sort();
+        const returns = [...new Set(schedules
+          .map((item: ScheduleItem) => item.DONUS_SAATI)
+          .filter(Boolean) // Boş değerleri filtrele
+        )].sort();
+
+        console.log('New departure times:', departures);
+        console.log('New return times:', returns);
+
+        setDepartureTimes(departures);
+        setReturnTimes(returns);
+        
+      } catch (error: any) {
+        console.error('Error fetching new line schedule:', error);
+        setErrorTimes(`Failed to load timetable for this line: ${error.message}`);
+      } finally {
+        setIsLoadingTimes(false);
+      }
+    };
+
+    fetchNewLineSchedule();
+
     const firstBusOfLine = busLocations.find(bus => bus.route === busLine);
     if (firstBusOfLine) {
       handleSelectBus(firstBusOfLine);
@@ -481,8 +638,69 @@ const Transportation = () => {
   };
 
   // --- Helpers ---
+  const getDayTypeText = (dayType: number): string => {
+    switch (dayType) {
+      case 1:
+        return 'Hafta İçi';
+      case 2:
+        return 'Cumartesi';
+      case 3:
+        return 'Pazar';
+      default:
+        return 'Bilinmiyor';
+    }
+  };
+
+  const handleDayTypeChange = (direction: number) => {
+    setSelectedDayType(prevDayType => {
+      let newDayType = prevDayType + direction;
+      if (newDayType > 3) {
+        newDayType = 1;
+      } else if (newDayType < 1) {
+        newDayType = 3;
+      }
+      
+      // Yeni gün tipi için saatleri çek
+      const fetchNewDaySchedule = async () => {
+        try {
+          setIsLoadingTimes(true);
+          setErrorTimes(null);
+          
+          console.log(`Fetching new day schedule for ${activeBusLine}, day type ${newDayType}`);
+          const schedules: ScheduleItem[] = await getBusSchedules(activeBusLine, newDayType);
+          console.log('New day schedules received:', schedules);
+          
+          // GIDIS_SAATI ve DONUS_SAATI'ni ayır ve sırala
+          const departures = [...new Set(schedules
+            .map((item: ScheduleItem) => item.GIDIS_SAATI)
+            .filter(Boolean) // Boş değerleri filtrele
+          )].sort();
+          const returns = [...new Set(schedules
+            .map((item: ScheduleItem) => item.DONUS_SAATI)
+            .filter(Boolean) // Boş değerleri filtrele
+          )].sort();
+
+          console.log('New day departure times:', departures);
+          console.log('New day return times:', returns);
+
+          setDepartureTimes(departures);
+          setReturnTimes(returns);
+          
+        } catch (error: any) {
+          console.error('Error fetching new day schedule:', error);
+          setErrorTimes(`Failed to load timetable for this day: ${error.message}`);
+        } finally {
+          setIsLoadingTimes(false);
+        }
+      };
+
+      fetchNewDaySchedule();
+      
+      return newDayType;
+    });
+  };
+
   const getRouteText = () => {
-    if (!filterByActiveLine) return 'All Buses';
     const details = BUS_LINE_DETAILS[activeBusLine];
     if (!details) return '';
     const [from, to] = reverseDirection ? [...details.ends].reverse() : details.ends;
@@ -645,30 +863,28 @@ const Transportation = () => {
       {/* Bottom Sheet */}
       <BottomSheet
         ref={bottomSheetRef}
-        index={1}
+        index={bottomSheetIndex}
         snapPoints={snapPoints}
         enablePanDownToClose={false}
+        enableOverDrag={false}
+        enableHandlePanningGesture={false}
         backgroundStyle={styles.bottomSheetBackground}
         handleIndicatorStyle={styles.bottomSheetIndicator}
+        onAnimate={(fromIndex, toIndex) => {
+          setBottomSheetIndex(toIndex);
+        }}
       >
         <BottomSheetView style={styles.bottomSheetContent}>
-          {/* Header with Route Buttons and Settings */}
+          {/* Header with Route Buttons and Settings - Fixed */}
           <View style={styles.timetableHeader}>
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
               style={styles.routeButtons}
               contentContainerStyle={styles.routeButtons}
+              scrollEnabled={true}
+              nestedScrollEnabled={false}
             >
-              {/* Show ALL button */}
-              <Pressable 
-                key="all"
-                style={[styles.routeButton, !filterByActiveLine && styles.activeRoute]}
-                onPress={() => setFilterByActiveLine(false)}
-              >
-                <Text style={!filterByActiveLine ? styles.routeButtonText : styles.routeButtonTextInactive}>All</Text>
-              </Pressable>
-
               {BUS_LINES.map(line => (
                 <Pressable 
                   key={line}
@@ -683,13 +899,10 @@ const Transportation = () => {
                   </Text>
                 </Pressable>
               ))}
-              <Pressable key="Ring" style={styles.routeButton}>
-                <Text style={styles.routeButtonTextInactive}>Ring</Text>
-              </Pressable>
             </ScrollView>
           </View>
 
-          {/* Route Display */}
+          {/* Route Display - Fixed */}
           <View style={styles.routeDisplay}>
             <Text style={styles.routeText}>{getRouteText()}</Text>
             <Pressable
@@ -700,71 +913,93 @@ const Transportation = () => {
             </Pressable>
           </View>
 
-          {/* Date Selector */}
+          {/* Date Selector - Fixed */}
           <View style={styles.dateSelector}>
-            <Pressable style={styles.dateArrow}>
+            <Pressable style={styles.dateArrow} onPress={() => handleDayTypeChange(-1)}>
               <Ionicons name="chevron-back" size={20} color="#666" />
             </Pressable>
-            <Text style={styles.dateText}>Today</Text>
-            <Pressable style={styles.dateArrow}>
+            <Text style={styles.dateText}>{getDayTypeText(selectedDayType)}</Text>
+            <Pressable style={styles.dateArrow} onPress={() => handleDayTypeChange(1)}>
               <Ionicons name="chevron-forward" size={20} color="#666" />
             </Pressable>
           </View>
 
-          {/* Timetable Content */}
-          <ScrollView style={styles.timetableContainer} showsVerticalScrollIndicator={false}>
+          {/* Timetable Content - Scrollable */}
+          <BottomSheetScrollView
+            style={styles.timetableContainer}
+            contentContainerStyle={styles.timetableContentContainer}
+            showsVerticalScrollIndicator={true}
+          >
             <View style={styles.timetableRow}>
-              {/* Left Column - Timetable */}
+              {/* Departure Times Column */}
               <View style={styles.timetableColumn}>
                 <Text style={styles.columnHeader}>Departure Times</Text>
-                {['10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00'].map((time, index) => (
-                  <View key={index} style={styles.timeItem}>
-                    <Ionicons name="time" size={16} color="#666" />
-                    <Text style={styles.timeText}>{time}</Text>
-                  </View>
-                ))}
+                {isLoadingTimes ? (
+                  <Text style={styles.infoText}>Loading...</Text>
+                ) : errorTimes ? (
+                  <Text style={styles.errorText}>{errorTimes}</Text>
+                ) : departureTimes.length > 0 ? (
+                  departureTimes.map((time, index) => (
+                    <View 
+                      key={`dep-${index}`} 
+                      style={[
+                        styles.timeItem,
+                        isNextBus(time) && styles.nextBusItem
+                      ]}
+                    >
+                      <Ionicons 
+                        name="time" 
+                        size={16} 
+                        color={isNextBus(time) ? "#9a0f21" : "#666"} 
+                      />
+                      <Text style={[
+                        styles.timeText,
+                        isNextBus(time) && styles.nextBusText
+                      ]}>
+                        {time}
+                      </Text>
+                    </View>
+                  ))
+                ) : (
+                  <Text style={styles.infoText}>No departures found.</Text>
+                )}
               </View>
 
-              {/* Right Column - Bus Stops */}
-              <View style={styles.stopsColumn}>
-                <Text style={styles.columnHeader}>Bus Stops</Text>
-                {[
-                  'Mimarlık',
-                  'Fen',
-                  'KYK',
-                  'Şehit A',
-                  'Kütüphane',
-                  'Hazırlık',
-                  'Mühendislik',
-                  'Rektörlük'
-                ].map((stop, index) => (
-                  <View key={index} style={styles.stopItem}>
-                    <Ionicons name="location" size={16} color="#4ECDC4" />
-                    <Text style={styles.stopText}>{stop}</Text>
-                  </View>
-                ))}
+              {/* Return Times Column */}
+              <View style={styles.timetableColumn}>
+                <Text style={styles.columnHeader}>Return Times</Text>
+                {isLoadingTimes ? (
+                  <Text style={styles.infoText}>Loading...</Text>
+                ) : errorTimes ? (
+                  <Text style={styles.errorText}>{errorTimes}</Text>
+                ) : returnTimes.length > 0 ? (
+                  returnTimes.map((time, index) => (
+                    <View 
+                      key={`ret-${index}`} 
+                      style={[
+                        styles.timeItem,
+                        isNextBus(time) && styles.nextBusItem
+                      ]}
+                    >
+                      <Ionicons 
+                        name="time" 
+                        size={16} 
+                        color={isNextBus(time) ? "#9a0f21" : "#666"} 
+                      />
+                      <Text style={[
+                        styles.timeText,
+                        isNextBus(time) && styles.nextBusText
+                      ]}>
+                        {time}
+                      </Text>
+                    </View>
+                  ))
+                ) : (
+                  <Text style={styles.infoText}>No returns found.</Text>
+                )}
               </View>
             </View>
-          </ScrollView>
-
-          {/* Bottom Navigation */}
-          <View style={styles.bottomNavigation}>
-            <Pressable style={styles.navItem}>
-              <Ionicons name="home" size={24} color="#9a0f21" />
-            </Pressable>
-            <Pressable style={styles.navItem}>
-              <Ionicons name="map" size={24} color="#666" />
-            </Pressable>
-            <Pressable style={styles.navItem}>
-              <Ionicons name="bus" size={24} color="#666" />
-            </Pressable>
-            <Pressable style={styles.navItem}>
-              <Ionicons name="time" size={24} color="#666" />
-            </Pressable>
-            <Pressable style={styles.navItem}>
-              <Ionicons name="person" size={24} color="#666" />
-            </Pressable>
-          </View>
+          </BottomSheetScrollView>
         </BottomSheetView>
       </BottomSheet>
     </View>
@@ -955,9 +1190,11 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#333',
   },
+  
   timetableContainer: {
     flex: 1,
-    marginBottom: 20,
+    minHeight: 200,
+    maxHeight: 800,
   },
   timetableRow: {
     flexDirection: 'row',
@@ -1006,20 +1243,29 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     color: '#333',
   },
-  bottomNavigation: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    paddingVertical: 12,
-    borderTopWidth: 1,
-    borderTopColor: '#E5E5E5',
-    backgroundColor: 'white',
+  infoText: {
+    textAlign: 'center',
+    color: '#666',
+    marginTop: 20,
   },
-  navItem: {
-    padding: 8,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
+  errorText: {
+    textAlign: 'center',
+    color: 'red',
+    marginTop: 20,
   },
+  timetableContentContainer: {
+    paddingVertical: 16,
+    paddingHorizontal: 16,
+    paddingBottom: 40,
+  },
+  nextBusItem: {
+    backgroundColor: '#FFD700',
+  },
+  nextBusText: {
+    fontWeight: 'bold',
+  },
+  
+  
 });
 
 export default Transportation;
